@@ -61,13 +61,13 @@ HistogramStat::HistogramStat() : num_buckets_(bucketMapper.BucketCount()) {
 }
 
 void HistogramStat::Clear() {
-  min_.store(bucketMapper.LastValue(), std::memory_order_relaxed);
-  max_.store(0, std::memory_order_relaxed);
-  num_.store(0, std::memory_order_relaxed);
-  sum_.store(0, std::memory_order_relaxed);
-  sum_squares_.store(0, std::memory_order_relaxed);
+  min_.store(bucketMapper.LastValue(), std::memory_order_seq_cst);
+  max_.store(0, std::memory_order_seq_cst);
+  num_.store(0, std::memory_order_seq_cst);
+  sum_.store(0, std::memory_order_seq_cst);
+  sum_squares_.store(0, std::memory_order_seq_cst);
   for (unsigned int b = 0; b < num_buckets_; b++) {
-    buckets_[b].store(0, std::memory_order_relaxed);
+    buckets_[b].store(0, std::memory_order_seq_cst);
   }
 }
 
@@ -79,26 +79,26 @@ void HistogramStat::Add(uint64_t value) {
   // by concurrent threads is tolerable.
   const size_t index = bucketMapper.IndexForValue(value);
   assert(index < num_buckets_);
-  buckets_[index].store(buckets_[index].load(std::memory_order_relaxed) + 1,
-                        std::memory_order_relaxed);
+  buckets_[index].store(buckets_[index].load(std::memory_order_seq_cst) + 1,
+                        std::memory_order_seq_cst);
 
   uint64_t old_min = min();
   if (value < old_min) {
-    min_.store(value, std::memory_order_relaxed);
+    min_.store(value, std::memory_order_seq_cst);
   }
 
   uint64_t old_max = max();
   if (value > old_max) {
-    max_.store(value, std::memory_order_relaxed);
+    max_.store(value, std::memory_order_seq_cst);
   }
 
-  num_.store(num_.load(std::memory_order_relaxed) + 1,
-             std::memory_order_relaxed);
-  sum_.store(sum_.load(std::memory_order_relaxed) + value,
-             std::memory_order_relaxed);
+  num_.store(num_.load(std::memory_order_seq_cst) + 1,
+             std::memory_order_seq_cst);
+  sum_.store(sum_.load(std::memory_order_seq_cst) + value,
+             std::memory_order_seq_cst);
   sum_squares_.store(
-      sum_squares_.load(std::memory_order_relaxed) + value * value,
-      std::memory_order_relaxed);
+      sum_squares_.load(std::memory_order_seq_cst) + value * value,
+      std::memory_order_seq_cst);
 }
 
 void HistogramStat::Merge(const HistogramStat& other) {
@@ -117,11 +117,11 @@ void HistogramStat::Merge(const HistogramStat& other) {
          !max_.compare_exchange_weak(old_max, other_max)) {
   }
 
-  num_.fetch_add(other.num(), std::memory_order_relaxed);
-  sum_.fetch_add(other.sum(), std::memory_order_relaxed);
-  sum_squares_.fetch_add(other.sum_squares(), std::memory_order_relaxed);
+  num_.fetch_add(other.num(), std::memory_order_seq_cst);
+  sum_.fetch_add(other.sum(), std::memory_order_seq_cst);
+  sum_squares_.fetch_add(other.sum_squares(), std::memory_order_seq_cst);
   for (unsigned int b = 0; b < num_buckets_; b++) {
-    buckets_[b].fetch_add(other.bucket_at(b), std::memory_order_relaxed);
+    buckets_[b].fetch_add(other.bucket_at(b), std::memory_order_seq_cst);
   }
 }
 

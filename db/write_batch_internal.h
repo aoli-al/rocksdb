@@ -250,7 +250,7 @@ class LocalSavePoint {
   explicit LocalSavePoint(WriteBatch* batch)
       : batch_(batch),
         savepoint_(batch->GetDataSize(), batch->Count(),
-                   batch->content_flags_.load(std::memory_order_relaxed))
+                   batch->content_flags_.load(std::memory_order_seq_cst))
 #ifndef NDEBUG
         ,
         committed_(false)
@@ -272,7 +272,7 @@ class LocalSavePoint {
         batch_->prot_info_->entries_.resize(savepoint_.count);
       }
       batch_->content_flags_.store(savepoint_.content_flags,
-                                   std::memory_order_relaxed);
+                                   std::memory_order_seq_cst);
       return Status::MemoryLimit();
     }
     return Status::OK();

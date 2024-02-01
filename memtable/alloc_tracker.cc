@@ -27,7 +27,7 @@ void AllocTracker::Allocate(size_t bytes) {
   assert(write_buffer_manager_ != nullptr);
   if (write_buffer_manager_->enabled() ||
       write_buffer_manager_->cost_to_cache()) {
-    bytes_allocated_.fetch_add(bytes, std::memory_order_relaxed);
+    bytes_allocated_.fetch_add(bytes, std::memory_order_seq_cst);
     write_buffer_manager_->ReserveMem(bytes);
   }
 }
@@ -37,9 +37,9 @@ void AllocTracker::DoneAllocating() {
     if (write_buffer_manager_->enabled() ||
         write_buffer_manager_->cost_to_cache()) {
       write_buffer_manager_->ScheduleFreeMem(
-          bytes_allocated_.load(std::memory_order_relaxed));
+          bytes_allocated_.load(std::memory_order_seq_cst));
     } else {
-      assert(bytes_allocated_.load(std::memory_order_relaxed) == 0);
+      assert(bytes_allocated_.load(std::memory_order_seq_cst) == 0);
     }
     done_allocating_ = true;
   }
@@ -53,9 +53,9 @@ void AllocTracker::FreeMem() {
     if (write_buffer_manager_->enabled() ||
         write_buffer_manager_->cost_to_cache()) {
       write_buffer_manager_->FreeMem(
-          bytes_allocated_.load(std::memory_order_relaxed));
+          bytes_allocated_.load(std::memory_order_seq_cst));
     } else {
-      assert(bytes_allocated_.load(std::memory_order_relaxed) == 0);
+      assert(bytes_allocated_.load(std::memory_order_seq_cst) == 0);
     }
     freed_ = true;
   }

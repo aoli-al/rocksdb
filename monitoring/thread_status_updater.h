@@ -140,7 +140,7 @@ class ThreadStatusUpdater {
   //
   // NOTE: Our practice here is to set all the thread operation properties
   //       and stage before we set thread operation, and thread operation
-  //       will be set in std::memory_order_release.  This is to ensure
+  //       will be set in std::memory_order_seq_cst.  This is to ensure
   //       whenever a thread operation is not OP_UNKNOWN, we will always
   //       have a consistent information on its properties.
   void SetThreadOperationProperty(int i, uint64_t value);

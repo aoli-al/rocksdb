@@ -492,7 +492,7 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
     RecordInHistogram(stats_, BYTES_PER_WRITE, total_byte_size);
 
     if (write_options.disableWAL) {
-      has_unpersisted_data_.store(true, std::memory_order_relaxed);
+      has_unpersisted_data_.store(true, std::memory_order_seq_cst);
     }
 
     PERF_TIMER_STOP(write_pre_and_post_process_time);
@@ -728,7 +728,7 @@ Status DBImpl::PipelinedWriteImpl(const WriteOptions& write_options,
         }
       }
       if (w.disable_wal) {
-        has_unpersisted_data_.store(true, std::memory_order_relaxed);
+        has_unpersisted_data_.store(true, std::memory_order_seq_cst);
       }
       write_thread_.UpdateLastSequence(current_sequence + total_count - 1);
     }
@@ -879,7 +879,7 @@ Status DBImpl::UnorderedWriteMemtable(const WriteOptions& write_options,
         seq_per_batch_, sub_batch_cnt, true /*batch_per_txn*/,
         write_options.memtable_insert_hint_per_batch);
     if (write_options.disableWAL) {
-      has_unpersisted_data_.store(true, std::memory_order_relaxed);
+      has_unpersisted_data_.store(true, std::memory_order_seq_cst);
     }
 
     PERF_TIMER_START(write_pre_and_post_process_time);
@@ -1845,11 +1845,11 @@ Status DBImpl::HandleWriteBufferManagerFlush(WriteContext* write_context) {
 
 uint64_t DBImpl::GetMaxTotalWalSize() const {
   uint64_t max_total_wal_size =
-      max_total_wal_size_.load(std::memory_order_acquire);
+      max_total_wal_size_.load(std::memory_order_seq_cst);
   if (max_total_wal_size > 0) {
     return max_total_wal_size;
   }
-  return 4 * max_total_in_memory_state_.load(std::memory_order_acquire);
+  return 4 * max_total_in_memory_state_.load(std::memory_order_seq_cst);
 }
 
 // REQUIRES: mutex_ is held
@@ -1909,7 +1909,7 @@ Status DBImpl::DelayWrite(uint64_t num_bytes, WriteThread& write_thread,
     while ((error_handler_.GetBGError().ok() ||
             error_handler_.IsRecoveryInProgress()) &&
            write_controller_.IsStopped() &&
-           !shutting_down_.load(std::memory_order_relaxed)) {
+           !shutting_down_.load(std::memory_order_seq_cst)) {
       if (write_options.no_slowdown) {
         return Status::Incomplete("Write stall");
       }
@@ -1942,7 +1942,7 @@ Status DBImpl::DelayWrite(uint64_t num_bytes, WriteThread& write_thread,
   // proceed
   Status s;
   if (write_controller_.IsStopped()) {
-    if (!shutting_down_.load(std::memory_order_relaxed)) {
+    if (!shutting_down_.load(std::memory_order_seq_cst)) {
       // If writes are still stopped and db not shutdown, it means we bailed
       // due to a background error
       s = Status::Incomplete(error_handler_.GetBGError().ToString());
@@ -2130,7 +2130,7 @@ void DBImpl::NotifyOnMemTableSealed(ColumnFamilyData* /*cfd*/,
   if (immutable_db_options_.listeners.size() == 0U) {
     return;
   }
-  if (shutting_down_.load(std::memory_order_acquire)) {
+  if (shutting_down_.load(std::memory_order_seq_cst)) {
     return;
   }
 

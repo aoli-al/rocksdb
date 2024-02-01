@@ -516,7 +516,7 @@ void WritePreparedTxnDB::CheckPreparedAgainstMax(SequenceNumber new_max,
                      " new_max=%" PRIu64 ")",
                      static_cast<uint64_t>(delayed_prepared_.size()),
                      to_be_popped, new_max);
-      delayed_prepared_empty_.store(false, std::memory_order_release);
+      delayed_prepared_empty_.store(false, std::memory_order_seq_cst);
       // Update prepared_txns_ after updating delayed_prepared_empty_ otherwise
       // there will be a point in time that the entry is neither in
       // prepared_txns_ nor in delayed_prepared_, which will not be checked if
@@ -567,7 +567,7 @@ void WritePreparedTxnDB::AddCommitted(uint64_t prepare_seq, uint64_t commit_seq,
   bool to_be_evicted = GetCommitEntry(indexed_seq, &evicted_64b, &evicted);
   if (LIKELY(to_be_evicted)) {
     assert(evicted.prep_seq != prepare_seq);
-    auto prev_max = max_evicted_seq_.load(std::memory_order_acquire);
+    auto prev_max = max_evicted_seq_.load(std::memory_order_seq_cst);
     ROCKS_LOG_DETAILS(info_log_,
                       "Evicting %" PRIu64 ",%" PRIu64 " with max %" PRIu64,
                       evicted.prep_seq, evicted.commit_seq, prev_max);
@@ -596,7 +596,7 @@ void WritePreparedTxnDB::AddCommitted(uint64_t prepare_seq, uint64_t commit_seq,
                         prev_max, max_evicted_seq);
       AdvanceMaxEvictedSeq(prev_max, max_evicted_seq);
     }
-    if (UNLIKELY(!delayed_prepared_empty_.load(std::memory_order_acquire))) {
+    if (UNLIKELY(!delayed_prepared_empty_.load(std::memory_order_seq_cst))) {
       WriteLock wl(&prepared_mutex_);
       auto dp_iter = delayed_prepared_.find(evicted.prep_seq);
       if (dp_iter != delayed_prepared_.end()) {
@@ -656,7 +656,7 @@ void WritePreparedTxnDB::RemovePrepared(const uint64_t prepare_seq,
       }
       bool is_empty = delayed_prepared_.empty();
       if (was_empty != is_empty) {
-        delayed_prepared_empty_.store(is_empty, std::memory_order_release);
+        delayed_prepared_empty_.store(is_empty, std::memory_order_seq_cst);
       }
     }
   }
@@ -666,7 +666,7 @@ bool WritePreparedTxnDB::GetCommitEntry(const uint64_t indexed_seq,
                                         CommitEntry64b* entry_64b,
                                         CommitEntry* entry) const {
   *entry_64b = commit_cache_[static_cast<size_t>(indexed_seq)].load(
-      std::memory_order_acquire);
+      std::memory_order_seq_cst);
   bool valid = entry_64b->Parse(indexed_seq, entry, FORMAT);
   return valid;
 }
@@ -677,7 +677,7 @@ bool WritePreparedTxnDB::AddCommitEntry(const uint64_t indexed_seq,
   CommitEntry64b new_entry_64b(new_entry, FORMAT);
   CommitEntry64b evicted_entry_64b =
       commit_cache_[static_cast<size_t>(indexed_seq)].exchange(
-          new_entry_64b, std::memory_order_acq_rel);
+          new_entry_64b, std::memory_order_seq_cst);
   bool valid = evicted_entry_64b.Parse(indexed_seq, evicted_entry, FORMAT);
   return valid;
 }
@@ -688,8 +688,8 @@ bool WritePreparedTxnDB::ExchangeCommitEntry(const uint64_t indexed_seq,
   auto& atomic_entry = commit_cache_[static_cast<size_t>(indexed_seq)];
   CommitEntry64b new_entry_64b(new_entry, FORMAT);
   bool succ = atomic_entry.compare_exchange_strong(
-      expected_entry_64b, new_entry_64b, std::memory_order_acq_rel,
-      std::memory_order_acquire);
+      expected_entry_64b, new_entry_64b, std::memory_order_seq_cst,
+      std::memory_order_seq_cst);
   return succ;
 }
 
@@ -705,8 +705,8 @@ void WritePreparedTxnDB::AdvanceMaxEvictedSeq(const SequenceNumber& prev_max,
   auto updated_future_max = prev_max;
   while (updated_future_max < new_max &&
          !future_max_evicted_seq_.compare_exchange_weak(
-             updated_future_max, new_max, std::memory_order_acq_rel,
-             std::memory_order_relaxed)) {
+             updated_future_max, new_max, std::memory_order_seq_cst,
+             std::memory_order_seq_cst)) {
   };
 
   CheckPreparedAgainstMax(new_max, false /*locked*/);
@@ -734,7 +734,7 @@ void WritePreparedTxnDB::AdvanceMaxEvictedSeq(const SequenceNumber& prev_max,
         // snapshots from the reads from committed values in valid snapshots.
         old_commit_map_[snap];
       }
-      old_commit_map_empty_.store(false, std::memory_order_release);
+      old_commit_map_empty_.store(false, std::memory_order_seq_cst);
     }
   }
   auto updated_prev_max = prev_max;
@@ -742,8 +742,8 @@ void WritePreparedTxnDB::AdvanceMaxEvictedSeq(const SequenceNumber& prev_max,
   TEST_SYNC_POINT("AdvanceMaxEvictedSeq::update_max:resume");
   while (updated_prev_max < new_max &&
          !max_evicted_seq_.compare_exchange_weak(updated_prev_max, new_max,
-                                                 std::memory_order_acq_rel,
-                                                 std::memory_order_relaxed)) {
+                                                 std::memory_order_seq_cst,
+                                                 std::memory_order_seq_cst)) {
   };
 }
 
@@ -847,7 +847,7 @@ void WritePreparedTxnDB::ReleaseSnapshotInternal(
     const SequenceNumber snap_seq) {
   // TODO(myabandeh): relax should enough since the synchronizatin is already
   // done by snapshots_mutex_ under which this function is called.
-  if (snap_seq <= max_evicted_seq_.load(std::memory_order_acquire)) {
+  if (snap_seq <= max_evicted_seq_.load(std::memory_order_seq_cst)) {
     // Then this is a rare case that transaction did not finish before max
     // advances. It is expected for a few read-only backup snapshots. For such
     // snapshots we might have kept around a couple of entries in the
@@ -868,7 +868,7 @@ void WritePreparedTxnDB::ReleaseSnapshotInternal(
       WriteLock wl(&old_commit_map_mutex_);
       old_commit_map_.erase(snap_seq);
       old_commit_map_empty_.store(old_commit_map_.empty(),
-                                  std::memory_order_release);
+                                  std::memory_order_seq_cst);
     }
   }
 }
@@ -927,7 +927,7 @@ void WritePreparedTxnDB::UpdateSnapshots(
   size_t i = 0;
   auto it = snapshots.begin();
   for (; it != snapshots.end() && i < SNAPSHOT_CACHE_SIZE; ++it, ++i) {
-    snapshot_cache_[i].store(*it, std::memory_order_release);
+    snapshot_cache_[i].store(*it, std::memory_order_seq_cst);
     TEST_IDX_SYNC_POINT("WritePreparedTxnDB::UpdateSnapshots:p:", ++sync_i);
     TEST_IDX_SYNC_POINT("WritePreparedTxnDB::UpdateSnapshots:s:", sync_i);
   }
@@ -947,7 +947,7 @@ void WritePreparedTxnDB::UpdateSnapshots(
   }
   // Update the size at the end. Otherwise a parallel reader might read
   // items that are not set yet.
-  snapshots_total_.store(snapshots.size(), std::memory_order_release);
+  snapshots_total_.store(snapshots.size(), std::memory_order_seq_cst);
 
   // Note: this must be done after the snapshots data structures are updated
   // with the new list of snapshots.
@@ -965,7 +965,7 @@ void WritePreparedTxnDB::CheckAgainstSnapshots(const CommitEntry& evicted) {
   size_t sync_i = 0;
 #endif
   // First check the snapshot cache that is efficient for concurrent access
-  auto cnt = snapshots_total_.load(std::memory_order_acquire);
+  auto cnt = snapshots_total_.load(std::memory_order_seq_cst);
   // The list might get updated concurrently as we are reading from it. The
   // reader should be able to read all the snapshots that are still valid
   // after the update. Since the survived snapshots are written in a higher
@@ -977,7 +977,7 @@ void WritePreparedTxnDB::CheckAgainstSnapshots(const CommitEntry& evicted) {
   size_t ip1 = std::min(cnt, SNAPSHOT_CACHE_SIZE);
   for (; 0 < ip1; ip1--) {
     SequenceNumber snapshot_seq =
-        snapshot_cache_[ip1 - 1].load(std::memory_order_acquire);
+        snapshot_cache_[ip1 - 1].load(std::memory_order_seq_cst);
     TEST_IDX_SYNC_POINT("WritePreparedTxnDB::CheckAgainstSnapshots:p:",
                         ++sync_i);
     TEST_IDX_SYNC_POINT("WritePreparedTxnDB::CheckAgainstSnapshots:s:", sync_i);
@@ -1013,7 +1013,7 @@ void WritePreparedTxnDB::CheckAgainstSnapshots(const CommitEntry& evicted) {
     // read snapshot_cache_ again while holding the lock.
     for (size_t i = 0; i < SNAPSHOT_CACHE_SIZE; i++) {
       SequenceNumber snapshot_seq =
-          snapshot_cache_[i].load(std::memory_order_acquire);
+          snapshot_cache_[i].load(std::memory_order_seq_cst);
       if (!MaybeUpdateOldCommitMap(evicted.prep_seq, evicted.commit_seq,
                                    snapshot_seq, next_is_larger)) {
         break;
@@ -1046,7 +1046,7 @@ bool WritePreparedTxnDB::MaybeUpdateOldCommitMap(
                    " commit entry: <%" PRIu64 ",%" PRIu64 ">",
                    snapshot_seq, prep_seq, commit_seq);
     WriteLock wl(&old_commit_map_mutex_);
-    old_commit_map_empty_.store(false, std::memory_order_release);
+    old_commit_map_empty_.store(false, std::memory_order_seq_cst);
     auto& vec = old_commit_map_[snapshot_seq];
     vec.insert(std::upper_bound(vec.begin(), vec.end(), prep_seq), prep_seq);
     // We need to store it once for each overlapping snapshot. Returning true to

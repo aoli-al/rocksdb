@@ -57,10 +57,10 @@ void WriteBufferManager::ReserveMem(size_t mem) {
   if (cache_res_mgr_ != nullptr) {
     ReserveMemWithCache(mem);
   } else if (enabled()) {
-    memory_used_.fetch_add(mem, std::memory_order_relaxed);
+    memory_used_.fetch_add(mem, std::memory_order_seq_cst);
   }
   if (enabled()) {
-    memory_active_.fetch_add(mem, std::memory_order_relaxed);
+    memory_active_.fetch_add(mem, std::memory_order_seq_cst);
   }
 }
 
@@ -71,8 +71,8 @@ void WriteBufferManager::ReserveMemWithCache(size_t mem) {
   // lock-free solution if it ends up with a performance bottleneck.
   std::lock_guard<std::mutex> lock(cache_res_mgr_mu_);
 
-  size_t new_mem_used = memory_used_.load(std::memory_order_relaxed) + mem;
-  memory_used_.store(new_mem_used, std::memory_order_relaxed);
+  size_t new_mem_used = memory_used_.load(std::memory_order_seq_cst) + mem;
+  memory_used_.store(new_mem_used, std::memory_order_seq_cst);
   Status s = cache_res_mgr_->UpdateCacheReservation(new_mem_used);
 
   // We absorb the error since WriteBufferManager is not able to handle
@@ -85,7 +85,7 @@ void WriteBufferManager::ReserveMemWithCache(size_t mem) {
 
 void WriteBufferManager::ScheduleFreeMem(size_t mem) {
   if (enabled()) {
-    memory_active_.fetch_sub(mem, std::memory_order_relaxed);
+    memory_active_.fetch_sub(mem, std::memory_order_seq_cst);
   }
 }
 
@@ -93,7 +93,7 @@ void WriteBufferManager::FreeMem(size_t mem) {
   if (cache_res_mgr_ != nullptr) {
     FreeMemWithCache(mem);
   } else if (enabled()) {
-    memory_used_.fetch_sub(mem, std::memory_order_relaxed);
+    memory_used_.fetch_sub(mem, std::memory_order_seq_cst);
   }
   // Check if stall is active and can be ended.
   MaybeEndWriteStall();
@@ -104,8 +104,8 @@ void WriteBufferManager::FreeMemWithCache(size_t mem) {
   // Use a mutex to protect various data structures. Can be optimized to a
   // lock-free solution if it ends up with a performance bottleneck.
   std::lock_guard<std::mutex> lock(cache_res_mgr_mu_);
-  size_t new_mem_used = memory_used_.load(std::memory_order_relaxed) - mem;
-  memory_used_.store(new_mem_used, std::memory_order_relaxed);
+  size_t new_mem_used = memory_used_.load(std::memory_order_seq_cst) - mem;
+  memory_used_.store(new_mem_used, std::memory_order_seq_cst);
   Status s = cache_res_mgr_->UpdateCacheReservation(new_mem_used);
 
   // We absorb the error since WriteBufferManager is not able to handle
@@ -125,7 +125,7 @@ void WriteBufferManager::BeginWriteStall(StallInterface* wbm_stall) {
     std::unique_lock<std::mutex> lock(mu_);
     // Verify if the stall conditions are stil active.
     if (ShouldStall()) {
-      stall_active_.store(true, std::memory_order_relaxed);
+      stall_active_.store(true, std::memory_order_seq_cst);
       queue_.splice(queue_.end(), std::move(new_node));
     }
   }
@@ -140,7 +140,7 @@ void WriteBufferManager::BeginWriteStall(StallInterface* wbm_stall) {
 // Called when memory is freed in FreeMem or the buffer size has changed.
 void WriteBufferManager::MaybeEndWriteStall() {
   // Stall conditions have not been resolved.
-  if (allow_stall_.load(std::memory_order_relaxed) &&
+  if (allow_stall_.load(std::memory_order_seq_cst) &&
       IsStallThresholdExceeded()) {
     return;
   }
@@ -149,12 +149,12 @@ void WriteBufferManager::MaybeEndWriteStall() {
   std::list<StallInterface*> cleanup;
 
   std::unique_lock<std::mutex> lock(mu_);
-  if (!stall_active_.load(std::memory_order_relaxed)) {
+  if (!stall_active_.load(std::memory_order_seq_cst)) {
     return;  // Nothing to do.
   }
 
   // Unblock new writers.
-  stall_active_.store(false, std::memory_order_relaxed);
+  stall_active_.store(false, std::memory_order_seq_cst);
 
   // Unblock the writers in the queue.
   for (StallInterface* wbm_stall : queue_) {
@@ -169,7 +169,7 @@ void WriteBufferManager::RemoveDBFromQueue(StallInterface* wbm_stall) {
   // Deallocate the removed nodes outside of the lock.
   std::list<StallInterface*> cleanup;
 
-  if (enabled() && allow_stall_.load(std::memory_order_relaxed)) {
+  if (enabled() && allow_stall_.load(std::memory_order_seq_cst)) {
     std::unique_lock<std::mutex> lock(mu_);
     for (auto it = queue_.begin(); it != queue_.end();) {
       auto next = std::next(it);

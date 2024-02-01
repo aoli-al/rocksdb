@@ -64,7 +64,7 @@ class ErrorHandler {
 
   Status ClearBGError();
 
-  bool IsDBStopped() { return is_db_stopped_.load(std::memory_order_acquire); }
+  bool IsDBStopped() { return is_db_stopped_.load(std::memory_order_seq_cst); }
 
   bool IsBGWorkStopped() {
     assert(db_mutex_);

@@ -98,8 +98,8 @@ inline void DynamicBloom::AddConcurrently(const Slice& key) {
 
 inline void DynamicBloom::AddHash(uint32_t hash) {
   AddHash(hash, [](std::atomic<uint64_t>* ptr, uint64_t mask) {
-    ptr->store(ptr->load(std::memory_order_relaxed) | mask,
-               std::memory_order_relaxed);
+    ptr->store(ptr->load(std::memory_order_seq_cst) | mask,
+               std::memory_order_seq_cst);
   });
 }
 
@@ -108,10 +108,10 @@ inline void DynamicBloom::AddHashConcurrently(uint32_t hash) {
     // Happens-before between AddHash and MaybeContains is handled by
     // access to versions_->LastSequence(), so all we have to do here is
     // avoid races (so we don't give the compiler a license to mess up
-    // our code) and not lose bits.  std::memory_order_relaxed is enough
+    // our code) and not lose bits.  std::memory_order_seq_cst is enough
     // for that.
-    if ((mask & ptr->load(std::memory_order_relaxed)) != mask) {
-      ptr->fetch_or(mask, std::memory_order_relaxed);
+    if ((mask & ptr->load(std::memory_order_seq_cst)) != mask) {
+      ptr->fetch_or(mask, std::memory_order_seq_cst);
     }
   });
 }
@@ -183,7 +183,7 @@ inline bool DynamicBloom::DoubleProbe(uint32_t h32, size_t byte_offset) const {
     // Two bit probes per uint64_t probe
     uint64_t mask =
         ((uint64_t)1 << (h & 63)) | ((uint64_t)1 << ((h >> 6) & 63));
-    uint64_t val = data_[byte_offset ^ i].load(std::memory_order_relaxed);
+    uint64_t val = data_[byte_offset ^ i].load(std::memory_order_seq_cst);
     if (i + 1 >= kNumDoubleProbes) {
       return (val & mask) == mask;
     } else if ((val & mask) != mask) {

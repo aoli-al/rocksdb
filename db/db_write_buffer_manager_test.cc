@@ -360,7 +360,7 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB1) {
           thread_num.fetch_add(1);
           cv.Signal();
           // Allow the flush to continue if all writer threads are blocked.
-          if (thread_num.load(std::memory_order_relaxed) == 2 * num_dbs + 1) {
+          if (thread_num.load(std::memory_order_seq_cst) == 2 * num_dbs + 1) {
             TEST_SYNC_POINT(
                 "DBWriteBufferManagerTest::SharedWriteBufferAcrossCFs:0");
           }
@@ -374,7 +374,7 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB1) {
           w_set.insert(w);
           thread_num.fetch_add(1);
           // Allow the flush continue if all writer threads are blocked.
-          if (thread_num.load(std::memory_order_relaxed) == 2 * num_dbs + 1) {
+          if (thread_num.load(std::memory_order_seq_cst) == 2 * num_dbs + 1) {
             TEST_SYNC_POINT(
                 "DBWriteBufferManagerTest::SharedWriteBufferAcrossCFs:0");
           }
@@ -515,7 +515,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsSingleDB) {
           w_slowdown_set.insert(w);
           // Allow the flush continue if all writer threads are blocked.
           if (w_slowdown_set.size() + (unsigned long)w_no_slowdown.load(
-                                          std::memory_order_relaxed) ==
+                                          std::memory_order_seq_cst) ==
               (unsigned long)num_writers) {
             TEST_SYNC_POINT(
                 "DBWriteBufferManagerTest::SharedWriteBufferAcrossCFs:0");
@@ -548,7 +548,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsSingleDB) {
       w_no_slowdown.fetch_add(1);
       // Allow the flush continue if all writer threads are blocked.
       if (w_slowdown_set.size() +
-              (unsigned long)w_no_slowdown.load(std::memory_order_relaxed) ==
+              (unsigned long)w_no_slowdown.load(std::memory_order_seq_cst) ==
           (unsigned long)num_writers) {
         TEST_SYNC_POINT(
             "DBWriteBufferManagerTest::SharedWriteBufferAcrossCFs:0");
@@ -594,7 +594,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsSingleDB) {
   // Number of Writer threads blocked.
   ASSERT_EQ(w_slowdown_set.size(), num_writers / 2);
   // Number of Writer threads with WriteOptions.no_slowdown = true.
-  ASSERT_EQ(w_no_slowdown.load(std::memory_order_relaxed), num_writers / 2);
+  ASSERT_EQ(w_no_slowdown.load(std::memory_order_seq_cst), num_writers / 2);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->ClearAllCallBacks();
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
@@ -664,7 +664,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
         cv.Signal();
         // Allow the flush continue if all writer threads are blocked.
         if (w_slowdown_set.size() +
-                (unsigned long)(w_no_slowdown.load(std::memory_order_relaxed) +
+                (unsigned long)(w_no_slowdown.load(std::memory_order_seq_cst) +
                                 wait_count_db) ==
             (unsigned long)(2 * num_dbs + 1)) {
           TEST_SYNC_POINT(
@@ -679,7 +679,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
         w_slowdown_set.insert(w);
         // Allow the flush continue if all writer threads are blocked.
         if (w_slowdown_set.size() +
-                (unsigned long)(w_no_slowdown.load(std::memory_order_relaxed) +
+                (unsigned long)(w_no_slowdown.load(std::memory_order_seq_cst) +
                                 wait_count_db) ==
             (unsigned long)(2 * num_dbs + 1)) {
           TEST_SYNC_POINT(
@@ -710,7 +710,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
       s2 = s2 && !tmp.ok();
       w_no_slowdown.fetch_add(1);
       if (w_slowdown_set.size() +
-              (unsigned long)(w_no_slowdown.load(std::memory_order_relaxed) +
+              (unsigned long)(w_no_slowdown.load(std::memory_order_seq_cst) +
                               wait_count_db) ==
           (unsigned long)(2 * num_dbs + 1)) {
         TEST_SYNC_POINT(
@@ -767,7 +767,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
   // queue.
   ASSERT_EQ(w_slowdown_set.size(), num_dbs / 2);
   // Number of threads with WriteOptions.no_slowdown = true.
-  ASSERT_EQ(w_no_slowdown.load(std::memory_order_relaxed), num_dbs);
+  ASSERT_EQ(w_no_slowdown.load(std::memory_order_seq_cst), num_dbs);
 
   // Clean up DBs.
   for (int i = 0; i < num_dbs; i++) {

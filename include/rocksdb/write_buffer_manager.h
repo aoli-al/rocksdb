@@ -66,32 +66,32 @@ class WriteBufferManager final {
   // Returns the total memory used by memtables.
   // Only valid if enabled()
   size_t memory_usage() const {
-    return memory_used_.load(std::memory_order_relaxed);
+    return memory_used_.load(std::memory_order_seq_cst);
   }
 
   // Returns the total memory used by active memtables.
   size_t mutable_memtable_memory_usage() const {
-    return memory_active_.load(std::memory_order_relaxed);
+    return memory_active_.load(std::memory_order_seq_cst);
   }
 
   size_t dummy_entries_in_cache_usage() const;
 
   // Returns the buffer_size.
   size_t buffer_size() const {
-    return buffer_size_.load(std::memory_order_relaxed);
+    return buffer_size_.load(std::memory_order_seq_cst);
   }
 
   // REQUIRED: `new_size` > 0
   void SetBufferSize(size_t new_size) {
     assert(new_size > 0);
-    buffer_size_.store(new_size, std::memory_order_relaxed);
-    mutable_limit_.store(new_size * 7 / 8, std::memory_order_relaxed);
+    buffer_size_.store(new_size, std::memory_order_seq_cst);
+    mutable_limit_.store(new_size * 7 / 8, std::memory_order_seq_cst);
     // Check if stall is active and can be ended.
     MaybeEndWriteStall();
   }
 
   void SetAllowStall(bool new_allow_stall) {
-    allow_stall_.store(new_allow_stall, std::memory_order_relaxed);
+    allow_stall_.store(new_allow_stall, std::memory_order_seq_cst);
     MaybeEndWriteStall();
   }
 
@@ -101,7 +101,7 @@ class WriteBufferManager final {
   bool ShouldFlush() const {
     if (enabled()) {
       if (mutable_memtable_memory_usage() >
-          mutable_limit_.load(std::memory_order_relaxed)) {
+          mutable_limit_.load(std::memory_order_seq_cst)) {
         return true;
       }
       size_t local_size = buffer_size();
@@ -124,7 +124,7 @@ class WriteBufferManager final {
   //
   // Should only be called by RocksDB internally .
   bool ShouldStall() const {
-    if (!allow_stall_.load(std::memory_order_relaxed) || !enabled()) {
+    if (!allow_stall_.load(std::memory_order_seq_cst) || !enabled()) {
       return false;
     }
 
@@ -133,7 +133,7 @@ class WriteBufferManager final {
 
   // Returns true if stall is active.
   bool IsStallActive() const {
-    return stall_active_.load(std::memory_order_relaxed);
+    return stall_active_.load(std::memory_order_seq_cst);
   }
 
   // Returns true if stalling condition is met.

@@ -370,7 +370,7 @@ bool MemTableListVersion::TrimHistory(autovector<MemTable*>* to_delete,
 bool MemTableList::IsFlushPending() const {
   if ((flush_requested_ && num_flush_not_started_ > 0) ||
       (num_flush_not_started_ >= min_write_buffer_number_to_merge_)) {
-    assert(imm_flush_needed.load(std::memory_order_relaxed));
+    assert(imm_flush_needed.load(std::memory_order_seq_cst));
     return true;
   }
   return false;
@@ -411,7 +411,7 @@ void MemTableList::PickMemtablesToFlush(uint64_t max_memtable_id,
       assert(!m->flush_completed_);
       num_flush_not_started_--;
       if (num_flush_not_started_ == 0) {
-        imm_flush_needed.store(false, std::memory_order_release);
+        imm_flush_needed.store(false, std::memory_order_seq_cst);
       }
       m->flush_in_progress_ = true;  // flushing will start very soon
       if (max_next_log_number) {
@@ -483,7 +483,7 @@ void MemTableList::RollbackMemtableFlush(const autovector<MemTable*>& mems,
     }
   }
   if (!mems.empty()) {
-    imm_flush_needed.store(true, std::memory_order_release);
+    imm_flush_needed.store(true, std::memory_order_seq_cst);
   }
 }
 
@@ -654,7 +654,7 @@ void MemTableList::Add(MemTable* m, autovector<MemTable*>* to_delete) {
   m->MarkImmutable();
   num_flush_not_started_++;
   if (num_flush_not_started_ == 1) {
-    imm_flush_needed.store(true, std::memory_order_release);
+    imm_flush_needed.store(true, std::memory_order_seq_cst);
   }
   UpdateCachedValuesFromMemTableListVersion();
   ResetTrimHistoryNeeded();
@@ -681,12 +681,12 @@ size_t MemTableList::ApproximateMemoryUsage() { return current_memory_usage_; }
 
 size_t MemTableList::MemoryAllocatedBytesExcludingLast() const {
   const size_t usage = current_memory_allocted_bytes_excluding_last_.load(
-      std::memory_order_relaxed);
+      std::memory_order_seq_cst);
   return usage;
 }
 
 bool MemTableList::HasHistory() const {
-  const bool has_history = current_has_history_.load(std::memory_order_relaxed);
+  const bool has_history = current_has_history_.load(std::memory_order_seq_cst);
   return has_history;
 }
 
@@ -694,10 +694,10 @@ void MemTableList::UpdateCachedValuesFromMemTableListVersion() {
   const size_t total_memtable_size =
       current_->MemoryAllocatedBytesExcludingLast();
   current_memory_allocted_bytes_excluding_last_.store(
-      total_memtable_size, std::memory_order_relaxed);
+      total_memtable_size, std::memory_order_seq_cst);
 
   const bool has_history = current_->HasHistory();
-  current_has_history_.store(has_history, std::memory_order_relaxed);
+  current_has_history_.store(has_history, std::memory_order_seq_cst);
 }
 
 uint64_t MemTableList::ApproximateOldestKeyTime() const {
@@ -794,7 +794,7 @@ void MemTableList::RemoveMemTablesOrRestoreFlags(
       m->edit_.Clear();
       num_flush_not_started_++;
       m->file_number_ = 0;
-      imm_flush_needed.store(true, std::memory_order_release);
+      imm_flush_needed.store(true, std::memory_order_seq_cst);
       ++mem_id;
     }
   }
@@ -986,7 +986,7 @@ Status InstallMemtableAtomicFlushResults(
         m->SetFileNumber(0);
         imm->num_flush_not_started_++;
       }
-      imm->imm_flush_needed.store(true, std::memory_order_release);
+      imm->imm_flush_needed.store(true, std::memory_order_seq_cst);
     }
   }
 
@@ -1012,7 +1012,7 @@ void MemTableList::RemoveOldMemTables(uint64_t log_number,
     current_->Remove(mem, to_delete);
     --num_flush_not_started_;
     if (0 == num_flush_not_started_) {
-      imm_flush_needed.store(false, std::memory_order_release);
+      imm_flush_needed.store(false, std::memory_order_seq_cst);
     }
   }
 

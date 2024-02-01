@@ -1037,11 +1037,11 @@ void CompactionJob::NotifyOnSubcompactionBegin(
   if (db_options_.listeners.empty()) {
     return;
   }
-  if (shutting_down_->load(std::memory_order_acquire)) {
+  if (shutting_down_->load(std::memory_order_seq_cst)) {
     return;
   }
   if (c->is_manual_compaction() &&
-      manual_compaction_canceled_.load(std::memory_order_acquire)) {
+      manual_compaction_canceled_.load(std::memory_order_seq_cst)) {
     return;
   }
 
@@ -1065,7 +1065,7 @@ void CompactionJob::NotifyOnSubcompactionCompleted(
   if (db_options_.listeners.empty()) {
     return;
   }
-  if (shutting_down_->load(std::memory_order_acquire)) {
+  if (shutting_down_->load(std::memory_order_seq_cst)) {
     return;
   }
 
@@ -1435,11 +1435,11 @@ void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
         Status::ColumnFamilyDropped("Column family dropped during compaction");
   }
   if ((status.ok() || status.IsColumnFamilyDropped()) &&
-      shutting_down_->load(std::memory_order_relaxed)) {
+      shutting_down_->load(std::memory_order_seq_cst)) {
     status = Status::ShutdownInProgress("Database shutdown");
   }
   if ((status.ok() || status.IsColumnFamilyDropped()) &&
-      (manual_compaction_canceled_.load(std::memory_order_relaxed))) {
+      (manual_compaction_canceled_.load(std::memory_order_seq_cst))) {
     status = Status::Incomplete(Status::SubCode::kManualCompactionPaused);
   }
   if (status.ok()) {

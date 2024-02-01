@@ -2014,7 +2014,7 @@ struct DBWithColumnFamilies {
     } else {
       rand_offset = rand_num % num_hot;
     }
-    return cfh[num_created.load(std::memory_order_acquire) - num_hot +
+    return cfh[num_created.load(std::memory_order_seq_cst) - num_hot +
                rand_offset];
   }
 
@@ -2037,7 +2037,7 @@ struct DBWithColumnFamilies {
         abort();
       }
     }
-    num_created.store(new_num_created, std::memory_order_release);
+    num_created.store(new_num_created, std::memory_order_seq_cst);
   }
 };
 
@@ -3869,7 +3869,7 @@ class Benchmark {
     }
 
     if (secondary_update_thread_) {
-      secondary_update_stopped_.store(1, std::memory_order_relaxed);
+      secondary_update_stopped_.store(1, std::memory_order_seq_cst);
       secondary_update_thread_->join();
       secondary_update_thread_.reset();
     }
@@ -4077,7 +4077,7 @@ class Benchmark {
     thread->stats.AddMessage("(each op is 1000 loads)");
     while (count < 100000) {
       for (int i = 0; i < 1000; i++) {
-        ptr = ap.load(std::memory_order_acquire);
+        ptr = ap.load(std::memory_order_seq_cst);
       }
       count++;
       thread->stats.FinishedOps(nullptr, nullptr, 1, kOthers);
@@ -4969,7 +4969,7 @@ class Benchmark {
         secondary_update_thread_.reset(new port::Thread(
             [this](int interval, DBWithColumnFamilies* _db) {
               while (0 == secondary_update_stopped_.load(
-                              std::memory_order_relaxed)) {
+                              std::memory_order_seq_cst)) {
                 Status secondary_update_status =
                     _db->db->TryCatchUpWithPrimary();
                 if (!secondary_update_status.ok()) {

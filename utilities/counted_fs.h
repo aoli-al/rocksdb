@@ -27,10 +27,10 @@ struct OpCounter {
   }
   void RecordOp(const IOStatus& io_s, size_t added_bytes) {
     if (!io_s.IsNotSupported()) {
-      ops.fetch_add(1, std::memory_order_relaxed);
+      ops.fetch_add(1, std::memory_order_seq_cst);
     }
     if (io_s.ok()) {
-      bytes.fetch_add(added_bytes, std::memory_order_relaxed);
+      bytes.fetch_add(added_bytes, std::memory_order_seq_cst);
     }
   }
 };

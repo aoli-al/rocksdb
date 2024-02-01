@@ -522,7 +522,7 @@ Status PointLockManager::AcquireLocked(LockMap* lock_map, LockMapStripe* stripe,
   } else {  // Lock not held.
     // Check lock limit
     if (max_num_locks_ > 0 &&
-        lock_map->lock_cnt.load(std::memory_order_acquire) >= max_num_locks_) {
+        lock_map->lock_cnt.load(std::memory_order_seq_cst) >= max_num_locks_) {
       result = Status::Busy(Status::SubCode::kLockLimit);
     } else {
       // acquire lock
@@ -564,7 +564,7 @@ void PointLockManager::UnLockKey(PessimisticTransaction* txn,
 
       if (max_num_locks_ > 0) {
         // Maintain lock count if there is a limit on the number of locks.
-        assert(lock_map->lock_cnt.load(std::memory_order_relaxed) > 0);
+        assert(lock_map->lock_cnt.load(std::memory_order_seq_cst) > 0);
         lock_map->lock_cnt--;
       }
     }

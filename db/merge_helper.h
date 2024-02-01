@@ -259,8 +259,8 @@ class MergeHelper {
   InternalKey compaction_filter_skip_until_;
 
   bool IsShuttingDown() {
-    // This is a best-effort facility, so memory_order_relaxed is sufficient.
-    return shutting_down_ && shutting_down_->load(std::memory_order_relaxed);
+    // This is a best-effort facility, so memory_order_seq_cst is sufficient.
+    return shutting_down_ && shutting_down_->load(std::memory_order_seq_cst);
   }
 
   template <typename Visitor>

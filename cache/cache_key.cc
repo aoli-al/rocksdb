@@ -38,7 +38,7 @@ CacheKey CacheKey::CreateUniqueForProcessLifetime() {
   // If this ever becomes a point of contention, we could sub-divide the
   // space and use CoreLocalArray.
   static std::atomic<uint64_t> counter{UINT64_MAX};
-  uint64_t id = counter.fetch_sub(1, std::memory_order_relaxed);
+  uint64_t id = counter.fetch_sub(1, std::memory_order_seq_cst);
   // Ensure we don't collide with CreateUniqueForCacheLifetime
   assert((id >> 63) == 1U);
   return CacheKey(0, id);

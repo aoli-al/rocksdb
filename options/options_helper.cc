@@ -438,7 +438,7 @@ static bool ParseOptionHelper(void* opt_address, const OptionType& opt_type,
       break;
     case OptionType::kAtomicInt:
       static_cast<std::atomic<int>*>(opt_address)
-          ->store(ParseInt(value), std::memory_order_release);
+          ->store(ParseInt(value), std::memory_order_seq_cst);
       break;
     case OptionType::kString:
       *static_cast<std::string*>(opt_address) = value;
@@ -531,7 +531,7 @@ bool SerializeSingleOptionHelper(const void* opt_address,
       break;
     case OptionType::kAtomicInt:
       *value = std::to_string(static_cast<const std::atomic<int>*>(opt_address)
-                                  ->load(std::memory_order_acquire));
+                                  ->load(std::memory_order_seq_cst));
       break;
     case OptionType::kString:
       *value =

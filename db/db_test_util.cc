@@ -40,18 +40,18 @@ SpecialEnv::SpecialEnv(Env* base, bool time_elapse_only_sleep)
       sleep_counter_(this),
       time_elapse_only_sleep_(time_elapse_only_sleep),
       no_slowdown_(time_elapse_only_sleep) {
-  delay_sstable_sync_.store(false, std::memory_order_release);
-  drop_writes_.store(false, std::memory_order_release);
-  no_space_.store(false, std::memory_order_release);
-  non_writable_.store(false, std::memory_order_release);
+  delay_sstable_sync_.store(false, std::memory_order_seq_cst);
+  drop_writes_.store(false, std::memory_order_seq_cst);
+  no_space_.store(false, std::memory_order_seq_cst);
+  non_writable_.store(false, std::memory_order_seq_cst);
   count_random_reads_ = false;
   count_sequential_reads_ = false;
-  manifest_sync_error_.store(false, std::memory_order_release);
-  manifest_write_error_.store(false, std::memory_order_release);
-  log_write_error_.store(false, std::memory_order_release);
-  no_file_overwrite_.store(false, std::memory_order_release);
-  random_file_open_counter_.store(0, std::memory_order_relaxed);
-  delete_count_.store(0, std::memory_order_relaxed);
+  manifest_sync_error_.store(false, std::memory_order_seq_cst);
+  manifest_write_error_.store(false, std::memory_order_seq_cst);
+  log_write_error_.store(false, std::memory_order_seq_cst);
+  no_file_overwrite_.store(false, std::memory_order_seq_cst);
+  random_file_open_counter_.store(0, std::memory_order_seq_cst);
+  delete_count_.store(0, std::memory_order_seq_cst);
   num_open_wal_file_.store(0);
   log_write_slowdown_ = 0;
   bytes_written_ = 0;

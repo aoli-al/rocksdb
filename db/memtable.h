@@ -145,7 +145,7 @@ class MemTable {
   // As a cheap version of `ApproximateMemoryUsage()`, this function doesn't
   // require external synchronization. The value may be less accurate though
   size_t ApproximateMemoryUsageFast() const {
-    return approximate_memory_usage_.load(std::memory_order_relaxed);
+    return approximate_memory_usage_.load(std::memory_order_seq_cst);
   }
 
   // used by MemTableListVersion::MemoryAllocatedBytesExcludingLast
@@ -178,7 +178,7 @@ class MemTable {
   // This method heuristically determines if the memtable should continue to
   // host more data.
   bool ShouldScheduleFlush() const {
-    return flush_state_.load(std::memory_order_relaxed) == FLUSH_REQUESTED;
+    return flush_state_.load(std::memory_order_seq_cst) == FLUSH_REQUESTED;
   }
 
   // Returns true if a flush should be scheduled and the caller should
@@ -186,8 +186,8 @@ class MemTable {
   bool MarkFlushScheduled() {
     auto before = FLUSH_REQUESTED;
     return flush_state_.compare_exchange_strong(before, FLUSH_SCHEDULED,
-                                                std::memory_order_relaxed,
-                                                std::memory_order_relaxed);
+                                                std::memory_order_seq_cst,
+                                                std::memory_order_seq_cst);
   }
 
   // Return an iterator that yields the contents of the memtable.
@@ -327,15 +327,15 @@ class MemTable {
   // Used in concurrent memtable inserts.
   void BatchPostProcess(const MemTablePostProcessInfo& update_counters) {
     num_entries_.fetch_add(update_counters.num_entries,
-                           std::memory_order_relaxed);
-    data_size_.fetch_add(update_counters.data_size, std::memory_order_relaxed);
+                           std::memory_order_seq_cst);
+    data_size_.fetch_add(update_counters.data_size, std::memory_order_seq_cst);
     if (update_counters.num_deletes != 0) {
       num_deletes_.fetch_add(update_counters.num_deletes,
-                             std::memory_order_relaxed);
+                             std::memory_order_seq_cst);
     }
     if (update_counters.num_range_deletes > 0) {
       num_range_deletes_.fetch_add(update_counters.num_range_deletes,
-                                   std::memory_order_relaxed);
+                                   std::memory_order_seq_cst);
     }
     UpdateFlushState();
   }
@@ -344,29 +344,29 @@ class MemTable {
   // REQUIRES: external synchronization to prevent simultaneous
   // operations on the same MemTable (unless this Memtable is immutable).
   uint64_t num_entries() const {
-    return num_entries_.load(std::memory_order_relaxed);
+    return num_entries_.load(std::memory_order_seq_cst);
   }
 
   // Get total number of deletes in the mem table.
   // REQUIRES: external synchronization to prevent simultaneous
   // operations on the same MemTable (unless this Memtable is immutable).
   uint64_t num_deletes() const {
-    return num_deletes_.load(std::memory_order_relaxed);
+    return num_deletes_.load(std::memory_order_seq_cst);
   }
 
   // Get total number of range deletions in the mem table.
   // REQUIRES: external synchronization to prevent simultaneous
   // operations on the same MemTable (unless this Memtable is immutable).
   uint64_t num_range_deletes() const {
-    return num_range_deletes_.load(std::memory_order_relaxed);
+    return num_range_deletes_.load(std::memory_order_seq_cst);
   }
 
   uint64_t get_data_size() const {
-    return data_size_.load(std::memory_order_relaxed);
+    return data_size_.load(std::memory_order_seq_cst);
   }
 
   size_t write_buffer_size() const {
-    return write_buffer_size_.load(std::memory_order_relaxed);
+    return write_buffer_size_.load(std::memory_order_seq_cst);
   }
 
   // Dynamically change the memtable's capacity. If set below the current usage,
@@ -377,7 +377,7 @@ class MemTable {
     if (bloom_filter_ == nullptr ||
         new_write_buffer_size < write_buffer_size_) {
       write_buffer_size_.store(new_write_buffer_size,
-                               std::memory_order_relaxed);
+                               std::memory_order_seq_cst);
     }
   }
 
@@ -394,7 +394,7 @@ class MemTable {
   // REQUIRES: external synchronization to prevent simultaneous
   // operations on the same MemTable (unless this Memtable is immutable).
   SequenceNumber GetFirstSequenceNumber() {
-    return first_seqno_.load(std::memory_order_relaxed);
+    return first_seqno_.load(std::memory_order_seq_cst);
   }
 
   // Returns the sequence number of the first element that was inserted
@@ -402,7 +402,7 @@ class MemTable {
   // REQUIRES: external synchronization to prevent simultaneous
   // operations on the same MemTable (unless this Memtable is immutable).
   void SetFirstSequenceNumber(SequenceNumber first_seqno) {
-    return first_seqno_.store(first_seqno, std::memory_order_relaxed);
+    return first_seqno_.store(first_seqno, std::memory_order_seq_cst);
   }
 
   // Returns the sequence number that is guaranteed to be smaller than or equal
@@ -413,7 +413,7 @@ class MemTable {
   // If the earliest sequence number could not be determined,
   // kMaxSequenceNumber will be returned.
   SequenceNumber GetEarliestSequenceNumber() {
-    return earliest_seqno_.load(std::memory_order_relaxed);
+    return earliest_seqno_.load(std::memory_order_seq_cst);
   }
 
   // Sets the sequence number that is guaranteed to be smaller than or equal
@@ -422,7 +422,7 @@ class MemTable {
   // sequence number will be present in this memtable or a later memtable.
   // Used only for MemPurge operation
   void SetEarliestSequenceNumber(SequenceNumber earliest_seqno) {
-    return earliest_seqno_.store(earliest_seqno, std::memory_order_relaxed);
+    return earliest_seqno_.store(earliest_seqno, std::memory_order_seq_cst);
   }
 
   // DB's latest sequence ID when the memtable is created. This number
@@ -497,7 +497,7 @@ class MemTable {
   }
 
   uint64_t ApproximateOldestKeyTime() const {
-    return oldest_key_time_.load(std::memory_order_relaxed);
+    return oldest_key_time_.load(std::memory_order_seq_cst);
   }
 
   // REQUIRES: db_mutex held.

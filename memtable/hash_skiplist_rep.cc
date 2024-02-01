@@ -67,7 +67,7 @@ class HashSkipListRep : public MemTableRep {
            bucket_size_;
   }
   inline Bucket* GetBucket(size_t i) const {
-    return buckets_[i].load(std::memory_order_acquire);
+    return buckets_[i].load(std::memory_order_seq_cst);
   }
   inline Bucket* GetBucket(const Slice& slice) const {
     return GetBucket(GetHash(slice));
@@ -244,7 +244,7 @@ HashSkipListRep::HashSkipListRep(const MemTableRep::KeyComparator& compare,
   buckets_ = new (mem) std::atomic<Bucket*>[bucket_size];
 
   for (size_t i = 0; i < bucket_size_; ++i) {
-    buckets_[i].store(nullptr, std::memory_order_relaxed);
+    buckets_[i].store(nullptr, std::memory_order_seq_cst);
   }
 }
 
@@ -258,7 +258,7 @@ HashSkipListRep::Bucket* HashSkipListRep::GetInitializedBucket(
     auto addr = allocator_->AllocateAligned(sizeof(Bucket));
     bucket = new (addr) Bucket(compare_, allocator_, skiplist_height_,
                                skiplist_branching_factor_);
-    buckets_[hash].store(bucket, std::memory_order_release);
+    buckets_[hash].store(bucket, std::memory_order_seq_cst);
   }
   return bucket;
 }

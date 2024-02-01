@@ -99,7 +99,7 @@ class BlockReadAmpBitmap {
   }
 
   Statistics* GetStatistics() {
-    return statistics_.load(std::memory_order_relaxed);
+    return statistics_.load(std::memory_order_seq_cst);
   }
 
   void SetStatistics(Statistics* stats) { statistics_.store(stats); }
@@ -119,7 +119,7 @@ class BlockReadAmpBitmap {
     const uint32_t byte_idx = bit_idx / kBitsPerEntry;
     const uint32_t bit_mask = 1 << (bit_idx % kBitsPerEntry);
 
-    return bitmap_[byte_idx].fetch_or(bit_mask, std::memory_order_relaxed) &
+    return bitmap_[byte_idx].fetch_or(bit_mask, std::memory_order_seq_cst) &
            bit_mask;
   }
 

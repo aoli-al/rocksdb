@@ -43,8 +43,8 @@ void HistogramWindowingImpl::Clear() {
   for (size_t i = 0; i < num_windows_; i++) {
     window_stats_[i].Clear();
   }
-  current_window_.store(0, std::memory_order_relaxed);
-  last_swap_time_.store(clock_->NowMicros(), std::memory_order_relaxed);
+  current_window_.store(0, std::memory_order_seq_cst);
+  last_swap_time_.store(clock_->NowMicros(), std::memory_order_seq_cst);
 }
 
 bool HistogramWindowingImpl::Empty() const { return stats_.Empty(); }
@@ -138,7 +138,7 @@ void HistogramWindowingImpl::SwapHistoryBucket() {
   // If mutex is held by Merge() or Clear(), next Add() will take care of the
   // swap, if needed.
   if (mutex_.try_lock()) {
-    last_swap_time_.store(clock_->NowMicros(), std::memory_order_relaxed);
+    last_swap_time_.store(clock_->NowMicros(), std::memory_order_seq_cst);
 
     uint64_t curr_window = current_window();
     uint64_t next_window =
@@ -151,7 +151,7 @@ void HistogramWindowingImpl::SwapHistoryBucket() {
     if (!stats_to_drop.Empty()) {
       for (size_t b = 0; b < stats_.num_buckets_; b++) {
         stats_.buckets_[b].fetch_sub(stats_to_drop.bucket_at(b),
-                                     std::memory_order_relaxed);
+                                     std::memory_order_seq_cst);
       }
 
       if (stats_.min() == stats_to_drop.min()) {
@@ -164,7 +164,7 @@ void HistogramWindowingImpl::SwapHistoryBucket() {
             }
           }
         }
-        stats_.min_.store(new_min, std::memory_order_relaxed);
+        stats_.min_.store(new_min, std::memory_order_seq_cst);
       }
 
       if (stats_.max() == stats_to_drop.max()) {
@@ -177,19 +177,19 @@ void HistogramWindowingImpl::SwapHistoryBucket() {
             }
           }
         }
-        stats_.max_.store(new_max, std::memory_order_relaxed);
+        stats_.max_.store(new_max, std::memory_order_seq_cst);
       }
 
-      stats_.num_.fetch_sub(stats_to_drop.num(), std::memory_order_relaxed);
-      stats_.sum_.fetch_sub(stats_to_drop.sum(), std::memory_order_relaxed);
+      stats_.num_.fetch_sub(stats_to_drop.num(), std::memory_order_seq_cst);
+      stats_.sum_.fetch_sub(stats_to_drop.sum(), std::memory_order_seq_cst);
       stats_.sum_squares_.fetch_sub(stats_to_drop.sum_squares(),
-                                    std::memory_order_relaxed);
+                                    std::memory_order_seq_cst);
 
       stats_to_drop.Clear();
     }
 
     // advance to next window bucket
-    current_window_.store(next_window, std::memory_order_relaxed);
+    current_window_.store(next_window, std::memory_order_seq_cst);
 
     mutex_.unlock();
   }

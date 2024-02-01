@@ -205,7 +205,7 @@ void UnpredictableUniqueIdGen::GenerateNextWithEntropy(uint64_t* upper,
   // of multithreading, we do not require atomicity on the whole entropy pool,
   // but instead only a piece of it (a 64-bit counter) that is sufficient to
   // guarantee uniqueness.
-  uint64_t count = counter_.fetch_add(1, std::memory_order_relaxed);
+  uint64_t count = counter_.fetch_add(1, std::memory_order_seq_cst);
   uint64_t a = count;
   uint64_t b = extra_entropy;
   // Invoking the hash function several times avoids copying all the inputs
@@ -216,8 +216,8 @@ void UnpredictableUniqueIdGen::GenerateNextWithEntropy(uint64_t* upper,
   // races, but use atomic operations for sanitizer-friendliness.
   for (size_t i = 0; i < pool_.size(); i += 2) {
     assert(i + 1 < pool_.size());
-    a ^= pool_[i].load(std::memory_order_relaxed);
-    b ^= pool_[i + 1].load(std::memory_order_relaxed);
+    a ^= pool_[i].load(std::memory_order_seq_cst);
+    b ^= pool_[i + 1].load(std::memory_order_seq_cst);
     BijectiveHash2x64(a, b, &a, &b);  // Based on XXH128
   }
 
@@ -228,7 +228,7 @@ void UnpredictableUniqueIdGen::GenerateNextWithEntropy(uint64_t* upper,
   // Add some back into pool. We don't really care that there's a race in
   // storing the result back and another thread computing the next value.
   // It's just an entropy pool.
-  pool_[count & (pool_.size() - 1)].fetch_add(a, std::memory_order_relaxed);
+  pool_[count & (pool_.size() - 1)].fetch_add(a, std::memory_order_seq_cst);
 }
 
 #ifndef NDEBUG

@@ -142,7 +142,7 @@ class BackupEngineImpl {
 
   IOStatus DeleteBackup(BackupID backup_id);
 
-  void StopBackup() { stop_backup_.store(true, std::memory_order_release); }
+  void StopBackup() { stop_backup_.store(true, std::memory_order_seq_cst); }
 
   IOStatus GarbageCollect();
 
@@ -2212,7 +2212,7 @@ IOStatus BackupEngineImpl::CopyOrCreateFile(
   Slice data;
   const IOOptions opts;
   do {
-    if (stop_backup_.load(std::memory_order_acquire)) {
+    if (stop_backup_.load(std::memory_order_seq_cst)) {
       return status_to_io_status(Status::Incomplete("Backup stopped"));
     }
     if (!src.empty()) {
@@ -2572,7 +2572,7 @@ IOStatus BackupEngineImpl::ReadFileAndComputeChecksum(
   Slice data;
 
   do {
-    if (stop_backup_.load(std::memory_order_acquire)) {
+    if (stop_backup_.load(std::memory_order_seq_cst)) {
       return status_to_io_status(Status::Incomplete("Backup stopped"));
     }
     size_t buffer_to_read =

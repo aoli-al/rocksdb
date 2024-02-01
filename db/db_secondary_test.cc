@@ -487,7 +487,7 @@ class TraceFileEnv : public EnvWrapper {
                              std::atomic<int>& counter)
           : target_(std::move(target)), files_closed_(counter) {}
       ~TracedRandomAccessFile() override {
-        files_closed_.fetch_add(1, std::memory_order_relaxed);
+        files_closed_.fetch_add(1, std::memory_order_seq_cst);
       }
       Status Read(uint64_t offset, size_t n, Slice* result,
                   char* scratch) const override {
@@ -506,7 +506,7 @@ class TraceFileEnv : public EnvWrapper {
   }
 
   int files_closed() const {
-    return files_closed_.load(std::memory_order_relaxed);
+    return files_closed_.load(std::memory_order_seq_cst);
   }
 
  private:

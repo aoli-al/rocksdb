@@ -243,7 +243,7 @@ void RunPrimary() {
 }
 
 void secondary_instance_sigint_handler(int signal) {
-  ShouldSecondaryWait().store(0, std::memory_order_relaxed);
+  ShouldSecondaryWait().store(0, std::memory_order_seq_cst);
   fprintf(stdout, "\n");
   fflush(stdout);
 };
@@ -281,7 +281,7 @@ void RunSecondary() {
 
   std::vector<std::thread> test_threads;
   test_threads.emplace_back([&]() {
-    while (1 == ShouldSecondaryWait().load(std::memory_order_relaxed)) {
+    while (1 == ShouldSecondaryWait().load(std::memory_order_seq_cst)) {
       std::unique_ptr<Iterator> iter(db->NewIterator(ropts));
       iter->SeekToFirst();
       size_t count = 0;
@@ -294,7 +294,7 @@ void RunSecondary() {
 
   test_threads.emplace_back([&]() {
     std::srand(time(nullptr));
-    while (1 == ShouldSecondaryWait().load(std::memory_order_relaxed)) {
+    while (1 == ShouldSecondaryWait().load(std::memory_order_seq_cst)) {
       Slice key = Key(std::rand() % kMaxKey);
       std::string value;
       db->Get(ropts, key, &value);
@@ -303,7 +303,7 @@ void RunSecondary() {
   });
 
   uint64_t curr_key = 0;
-  while (1 == ShouldSecondaryWait().load(std::memory_order_relaxed)) {
+  while (1 == ShouldSecondaryWait().load(std::memory_order_seq_cst)) {
     s = db->TryCatchUpWithPrimary();
     if (!s.ok()) {
       fprintf(stderr,

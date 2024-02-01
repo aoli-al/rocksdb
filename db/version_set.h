@@ -1333,15 +1333,15 @@ class VersionSet {
 
   // Return the last sequence number.
   uint64_t LastSequence() const {
-    return last_sequence_.load(std::memory_order_acquire);
+    return last_sequence_.load(std::memory_order_seq_cst);
   }
 
-  // Note: memory_order_acquire must be sufficient.
+  // Note: memory_order_seq_cst must be sufficient.
   uint64_t LastAllocatedSequence() const {
     return last_allocated_sequence_.load(std::memory_order_seq_cst);
   }
 
-  // Note: memory_order_acquire must be sufficient.
+  // Note: memory_order_seq_cst must be sufficient.
   uint64_t LastPublishedSequence() const {
     return last_published_sequence_.load(std::memory_order_seq_cst);
   }
@@ -1351,22 +1351,22 @@ class VersionSet {
     assert(s >= last_sequence_);
     // Last visible sequence must always be less than last written seq
     assert(!db_options_->two_write_queues || s <= last_allocated_sequence_);
-    last_sequence_.store(s, std::memory_order_release);
+    last_sequence_.store(s, std::memory_order_seq_cst);
   }
 
-  // Note: memory_order_release must be sufficient
+  // Note: memory_order_seq_cst must be sufficient
   void SetLastPublishedSequence(uint64_t s) {
     assert(s >= last_published_sequence_);
     last_published_sequence_.store(s, std::memory_order_seq_cst);
   }
 
-  // Note: memory_order_release must be sufficient
+  // Note: memory_order_seq_cst must be sufficient
   void SetLastAllocatedSequence(uint64_t s) {
     assert(s >= last_allocated_sequence_);
     last_allocated_sequence_.store(s, std::memory_order_seq_cst);
   }
 
-  // Note: memory_order_release must be sufficient
+  // Note: memory_order_seq_cst must be sufficient
   uint64_t FetchAddLastAllocatedSequence(uint64_t s) {
     return last_allocated_sequence_.fetch_add(s, std::memory_order_seq_cst);
   }

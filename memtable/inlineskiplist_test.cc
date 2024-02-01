@@ -377,9 +377,9 @@ class ConcurrentTest {
   struct State {
     std::atomic<int> generation[K];
     void Set(int k, int v) {
-      generation[k].store(v, std::memory_order_release);
+      generation[k].store(v, std::memory_order_seq_cst);
     }
-    int Get(int k) { return generation[k].load(std::memory_order_acquire); }
+    int Get(int k) { return generation[k].load(std::memory_order_seq_cst); }
 
     State() {
       for (unsigned int k = 0; k < K; k++) {
@@ -572,7 +572,7 @@ static void ConcurrentReader(void* arg) {
   Random rnd(state->seed_);
   int64_t reads = 0;
   state->Change(TestState::RUNNING);
-  while (!state->quit_flag_.load(std::memory_order_acquire)) {
+  while (!state->quit_flag_.load(std::memory_order_seq_cst)) {
     state->t_.ReadStep(&rnd);
     ++reads;
   }
@@ -603,7 +603,7 @@ static void RunConcurrentRead(int run) {
     for (int k = 0; k < kSize; ++k) {
       state.t_.WriteStep(&rnd);
     }
-    state.quit_flag_.store(true, std::memory_order_release);
+    state.quit_flag_.store(true, std::memory_order_seq_cst);
     state.Wait(TestState::DONE);
   }
 }
@@ -632,7 +632,7 @@ static void RunConcurrentInsert(int run, bool use_hint = false,
       }
       state.WaitForPendingWriters();
     }
-    state.quit_flag_.store(true, std::memory_order_release);
+    state.quit_flag_.store(true, std::memory_order_seq_cst);
     state.Wait(TestState::DONE);
   }
 }

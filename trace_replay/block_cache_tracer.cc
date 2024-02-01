@@ -488,7 +488,7 @@ Status BlockCacheTracer::WriteBlockAccess(const BlockCacheTraceRecord& record,
 }
 
 uint64_t BlockCacheTracer::NextGetId() {
-  if (!writer_.load(std::memory_order_relaxed)) {
+  if (!writer_.load(std::memory_order_seq_cst)) {
     return BlockCacheTraceHelper::kReservedGetId;
   }
   uint64_t prev_value = get_id_counter_.fetch_add(1);

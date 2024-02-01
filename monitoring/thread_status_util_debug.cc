@@ -17,11 +17,11 @@ static std::atomic<int> states_delay[ThreadStatus::NUM_STATE_TYPES];
 
 void ThreadStatusUtil::TEST_SetStateDelay(const ThreadStatus::StateType state,
                                           int micro) {
-  states_delay[state].store(micro, std::memory_order_relaxed);
+  states_delay[state].store(micro, std::memory_order_seq_cst);
 }
 
 void ThreadStatusUtil::TEST_StateDelay(const ThreadStatus::StateType state) {
-  auto delay = states_delay[state].load(std::memory_order_relaxed);
+  auto delay = states_delay[state].load(std::memory_order_seq_cst);
   if (delay > 0) {
     SystemClock::Default()->SleepForMicroseconds(delay);
   }

@@ -291,7 +291,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
   DumpSupportInfo(immutable_db_options_.info_log.get());
 
   max_total_wal_size_.store(mutable_db_options_.max_total_wal_size,
-                            std::memory_order_relaxed);
+                            std::memory_order_seq_cst);
   if (write_buffer_manager_) {
     wbm_stall_.reset(new WBMStallInterface());
   }
@@ -490,14 +490,14 @@ void DBImpl::CancelAllBackgroundWork(bool wait) {
   s.PermitUncheckedError();
 
   InstrumentedMutexLock l(&mutex_);
-  if (!shutting_down_.load(std::memory_order_acquire) &&
-      has_unpersisted_data_.load(std::memory_order_relaxed) &&
+  if (!shutting_down_.load(std::memory_order_seq_cst) &&
+      has_unpersisted_data_.load(std::memory_order_seq_cst) &&
       !mutable_db_options_.avoid_flush_during_shutdown) {
     s = DBImpl::FlushAllColumnFamilies(FlushOptions(), FlushReason::kShutDown);
     s.PermitUncheckedError();  //**TODO: What to do on error?
   }
 
-  shutting_down_.store(true, std::memory_order_release);
+  shutting_down_.store(true, std::memory_order_seq_cst);
   bg_cv_.SignalAll();
   if (!wait) {
     return;
@@ -1390,7 +1390,7 @@ Status DBImpl::SetDBOptions(
       if (new_options.max_total_wal_size !=
           mutable_db_options_.max_total_wal_size) {
         max_total_wal_size_.store(new_options.max_total_wal_size,
-                                  std::memory_order_release);
+                                  std::memory_order_seq_cst);
       }
       if (s.ok()) {
         if (new_options.stats_persist_period_sec == 0) {
@@ -2324,7 +2324,7 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
   PERF_TIMER_STOP(get_snapshot_time);
 
   bool skip_memtable = (read_options.read_tier == kPersistedTier &&
-                        has_unpersisted_data_.load(std::memory_order_relaxed));
+                        has_unpersisted_data_.load(std::memory_order_seq_cst));
   bool done = false;
   std::string* timestamp =
       ucmp->timestamp_size() > 0 ? get_impl_options.timestamp : nullptr;
@@ -2652,7 +2652,7 @@ std::vector<Status> DBImpl::MultiGet(
     auto super_version = mgd.super_version;
     bool skip_memtable =
         (read_options.read_tier == kPersistedTier &&
-         has_unpersisted_data_.load(std::memory_order_relaxed));
+         has_unpersisted_data_.load(std::memory_order_seq_cst));
     bool done = false;
     if (!skip_memtable) {
       if (super_version->mem->Get(
@@ -3341,7 +3341,7 @@ Status DBImpl::MultiGetImpl(
 
     bool skip_memtable =
         (read_options.read_tier == kPersistedTier &&
-         has_unpersisted_data_.load(std::memory_order_relaxed));
+         has_unpersisted_data_.load(std::memory_order_seq_cst));
     if (!skip_memtable) {
       super_version->mem->MultiGet(read_options, &range, callback,
                                    false /* immutable_memtable */);

@@ -555,7 +555,7 @@ TEST_P(DBBloomFilterTestWithParam, BloomFilter) {
     ASSERT_OK(Flush(1));
 
     // Prevent auto compactions triggered by seeks
-    env_->delay_sstable_sync_.store(true, std::memory_order_release);
+    env_->delay_sstable_sync_.store(true, std::memory_order_seq_cst);
 
     // Lookup present keys.  Should rarely read from small sstable.
     env_->random_read_counter_.Reset();
@@ -607,7 +607,7 @@ TEST_P(DBBloomFilterTestWithParam, BloomFilter) {
     uint64_t num_filter_entries = ParseUint64(props["num_filter_entries"]);
     EXPECT_EQ(num_filter_entries, nkeys);
 
-    env_->delay_sstable_sync_.store(false, std::memory_order_release);
+    env_->delay_sstable_sync_.store(false, std::memory_order_seq_cst);
     Close();
   } while (ChangeCompactOptions());
 }

@@ -442,7 +442,7 @@ SuperVersion::~SuperVersion() {
 }
 
 SuperVersion* SuperVersion::Ref() {
-  refs.fetch_add(1, std::memory_order_relaxed);
+  refs.fetch_add(1, std::memory_order_seq_cst);
   return this;
 }
 
@@ -454,7 +454,7 @@ bool SuperVersion::Unref() {
 }
 
 void SuperVersion::Cleanup() {
-  assert(refs.load(std::memory_order_relaxed) == 0);
+  assert(refs.load(std::memory_order_seq_cst) == 0);
   // Since this SuperVersion object is being deleted,
   // decrement reference to the immutable MemtableList
   // this SV object was pointing to.
@@ -481,7 +481,7 @@ void SuperVersion::Init(ColumnFamilyData* new_cfd, MemTable* new_mem,
   mem->Ref();
   imm->Ref();
   current->Ref();
-  refs.store(1, std::memory_order_relaxed);
+  refs.store(1, std::memory_order_seq_cst);
 }
 
 namespace {
@@ -647,7 +647,7 @@ ColumnFamilyData::ColumnFamilyData(
 
 // DB mutex held
 ColumnFamilyData::~ColumnFamilyData() {
-  assert(refs_.load(std::memory_order_relaxed) == 0);
+  assert(refs_.load(std::memory_order_seq_cst) == 0);
   // remove from linked list
   auto prev = prev_;
   auto next = next_;

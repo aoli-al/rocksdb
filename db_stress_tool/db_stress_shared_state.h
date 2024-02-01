@@ -333,11 +333,11 @@ class SharedState {
   bool PrintingVerificationResults() {
     bool tmp = false;
     return !printing_verification_results_.compare_exchange_strong(
-        tmp, true, std::memory_order_relaxed);
+        tmp, true, std::memory_order_seq_cst);
   }
 
   void FinishPrintingVerificationResults() {
-    printing_verification_results_.store(false, std::memory_order_relaxed);
+    printing_verification_results_.store(false, std::memory_order_seq_cst);
   }
 
   uint64_t GetStartTimestamp() const { return start_timestamp_; }

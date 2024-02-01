@@ -554,15 +554,15 @@ class InternalStats {
                   bool concurrent = false) {
     auto& v = db_stats_[type];
     if (concurrent) {
-      v.fetch_add(value, std::memory_order_relaxed);
+      v.fetch_add(value, std::memory_order_seq_cst);
     } else {
-      v.store(v.load(std::memory_order_relaxed) + value,
-              std::memory_order_relaxed);
+      v.store(v.load(std::memory_order_seq_cst) + value,
+              std::memory_order_seq_cst);
     }
   }
 
   uint64_t GetDBStats(InternalDBStatsType type) {
-    return db_stats_[type].load(std::memory_order_relaxed);
+    return db_stats_[type].load(std::memory_order_seq_cst);
   }
 
   HistogramImpl* GetFileReadHist(int level) {

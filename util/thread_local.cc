@@ -18,7 +18,7 @@ namespace ROCKSDB_NAMESPACE {
 
 struct Entry {
   Entry() : ptr(nullptr) {}
-  Entry(const Entry& e) : ptr(e.ptr.load(std::memory_order_relaxed)) {}
+  Entry(const Entry& e) : ptr(e.ptr.load(std::memory_order_seq_cst)) {}
   std::atomic<void*> ptr;
 };
 
@@ -378,7 +378,7 @@ void* ThreadLocalPtr::StaticMeta::Get(uint32_t id) const {
   if (UNLIKELY(id >= tls->entries.size())) {
     return nullptr;
   }
-  return tls->entries[id].ptr.load(std::memory_order_acquire);
+  return tls->entries[id].ptr.load(std::memory_order_seq_cst);
 }
 
 void ThreadLocalPtr::StaticMeta::Reset(uint32_t id, void* ptr) {
@@ -388,7 +388,7 @@ void ThreadLocalPtr::StaticMeta::Reset(uint32_t id, void* ptr) {
     MutexLock l(Mutex());
     tls->entries.resize(id + 1);
   }
-  tls->entries[id].ptr.store(ptr, std::memory_order_release);
+  tls->entries[id].ptr.store(ptr, std::memory_order_seq_cst);
 }
 
 void* ThreadLocalPtr::StaticMeta::Swap(uint32_t id, void* ptr) {
@@ -398,7 +398,7 @@ void* ThreadLocalPtr::StaticMeta::Swap(uint32_t id, void* ptr) {
     MutexLock l(Mutex());
     tls->entries.resize(id + 1);
   }
-  return tls->entries[id].ptr.exchange(ptr, std::memory_order_acquire);
+  return tls->entries[id].ptr.exchange(ptr, std::memory_order_seq_cst);
 }
 
 bool ThreadLocalPtr::StaticMeta::CompareAndSwap(uint32_t id, void* ptr,
@@ -410,7 +410,7 @@ bool ThreadLocalPtr::StaticMeta::CompareAndSwap(uint32_t id, void* ptr,
     tls->entries.resize(id + 1);
   }
   return tls->entries[id].ptr.compare_exchange_strong(
-      expected, ptr, std::memory_order_release, std::memory_order_relaxed);
+      expected, ptr, std::memory_order_seq_cst, std::memory_order_seq_cst);
 }
 
 void ThreadLocalPtr::StaticMeta::Scrape(uint32_t id, autovector<void*>* ptrs,
@@ -419,7 +419,7 @@ void ThreadLocalPtr::StaticMeta::Scrape(uint32_t id, autovector<void*>* ptrs,
   for (ThreadData* t = head_.next; t != &head_; t = t->next) {
     if (id < t->entries.size()) {
       void* ptr =
-          t->entries[id].ptr.exchange(replacement, std::memory_order_acquire);
+          t->entries[id].ptr.exchange(replacement, std::memory_order_seq_cst);
       if (ptr != nullptr) {
         ptrs->push_back(ptr);
       }

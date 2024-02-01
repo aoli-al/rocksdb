@@ -41,7 +41,7 @@ WriteController::GetCompactionPressureToken() {
 }
 
 bool WriteController::IsStopped() const {
-  return total_stopped_.load(std::memory_order_relaxed) > 0;
+  return total_stopped_.load(std::memory_order_seq_cst) > 0;
 }
 // This is inside DB mutex, so we can't sleep and need to minimize
 // frequency to get time.
@@ -49,10 +49,10 @@ bool WriteController::IsStopped() const {
 // synchronization model here.
 // The function trust caller will sleep micros returned.
 uint64_t WriteController::GetDelay(SystemClock* clock, uint64_t num_bytes) {
-  if (total_stopped_.load(std::memory_order_relaxed) > 0) {
+  if (total_stopped_.load(std::memory_order_seq_cst) > 0) {
     return 0;
   }
-  if (total_delayed_.load(std::memory_order_relaxed) == 0) {
+  if (total_delayed_.load(std::memory_order_seq_cst) == 0) {
     return 0;
   }
 

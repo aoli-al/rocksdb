@@ -22,9 +22,9 @@ void FlushScheduler::ScheduleWork(ColumnFamilyData* cfd) {
   cfd->Ref();
 // Suppress false positive clang analyzer warnings.
 #ifndef __clang_analyzer__
-  Node* node = new Node{cfd, head_.load(std::memory_order_relaxed)};
+  Node* node = new Node{cfd, head_.load(std::memory_order_seq_cst)};
   while (!head_.compare_exchange_strong(
-      node->next, node, std::memory_order_relaxed, std::memory_order_relaxed)) {
+      node->next, node, std::memory_order_seq_cst, std::memory_order_seq_cst)) {
     // failing CAS updates the first param, so we are already set for
     // retry.  TakeNextColumnFamily won't happen until after another
     // inter-thread synchronization, so we don't even need release
@@ -35,13 +35,13 @@ void FlushScheduler::ScheduleWork(ColumnFamilyData* cfd) {
 
 ColumnFamilyData* FlushScheduler::TakeNextColumnFamily() {
   while (true) {
-    if (head_.load(std::memory_order_relaxed) == nullptr) {
+    if (head_.load(std::memory_order_seq_cst) == nullptr) {
       return nullptr;
     }
 
     // dequeue the head
-    Node* node = head_.load(std::memory_order_relaxed);
-    head_.store(node->next, std::memory_order_relaxed);
+    Node* node = head_.load(std::memory_order_seq_cst);
+    head_.store(node->next, std::memory_order_seq_cst);
     ColumnFamilyData* cfd = node->column_family;
     delete node;
 
@@ -65,7 +65,7 @@ ColumnFamilyData* FlushScheduler::TakeNextColumnFamily() {
 }
 
 bool FlushScheduler::Empty() {
-  auto rv = head_.load(std::memory_order_relaxed) == nullptr;
+  auto rv = head_.load(std::memory_order_seq_cst) == nullptr;
 #ifndef NDEBUG
   std::lock_guard<std::mutex> lock(checking_mutex_);
   // Empty is allowed to be called concurrnetly with ScheduleFlush. It would
@@ -80,7 +80,7 @@ void FlushScheduler::Clear() {
   while ((cfd = TakeNextColumnFamily()) != nullptr) {
     cfd->UnrefAndTryDelete();
   }
-  assert(head_.load(std::memory_order_relaxed) == nullptr);
+  assert(head_.load(std::memory_order_seq_cst) == nullptr);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

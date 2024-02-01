@@ -714,7 +714,7 @@ Status DBImpl::AtomicFlushMemTablesToOutputFiles(
         // Something went wrong elsewhere, we cannot count on waiting for our
         // turn to write/sync to MANIFEST or CURRENT. Just return.
         return std::make_pair(versions_->io_status(), false);
-      } else if (shutting_down_.load(std::memory_order_acquire)) {
+      } else if (shutting_down_.load(std::memory_order_seq_cst)) {
         return std::make_pair(Status::ShutdownInProgress(), false);
       }
       bool ready = true;
@@ -942,7 +942,7 @@ void DBImpl::NotifyOnFlushBegin(ColumnFamilyData* cfd, FileMetaData* file_meta,
     return;
   }
   mutex_.AssertHeld();
-  if (shutting_down_.load(std::memory_order_acquire)) {
+  if (shutting_down_.load(std::memory_order_seq_cst)) {
     return;
   }
   bool triggered_writes_slowdown =
@@ -987,7 +987,7 @@ void DBImpl::NotifyOnFlushCompleted(
     return;
   }
   mutex_.AssertHeld();
-  if (shutting_down_.load(std::memory_order_acquire)) {
+  if (shutting_down_.load(std::memory_order_seq_cst)) {
     return;
   }
   bool triggered_writes_slowdown =
@@ -1019,11 +1019,11 @@ Status DBImpl::CompactRange(const CompactRangeOptions& options,
                             ColumnFamilyHandle* column_family,
                             const Slice* begin_without_ts,
                             const Slice* end_without_ts) {
-  if (manual_compaction_paused_.load(std::memory_order_acquire) > 0) {
+  if (manual_compaction_paused_.load(std::memory_order_seq_cst) > 0) {
     return Status::Incomplete(Status::SubCode::kManualCompactionPaused);
   }
 
-  if (options.canceled && options.canceled->load(std::memory_order_acquire)) {
+  if (options.canceled && options.canceled->load(std::memory_order_seq_cst)) {
     return Status::Incomplete(Status::SubCode::kManualCompactionPaused);
   }
 
@@ -1472,10 +1472,10 @@ Status DBImpl::CompactFilesImpl(
     CompactionJobInfo* compaction_job_info) {
   mutex_.AssertHeld();
 
-  if (shutting_down_.load(std::memory_order_acquire)) {
+  if (shutting_down_.load(std::memory_order_seq_cst)) {
     return Status::ShutdownInProgress();
   }
-  if (manual_compaction_paused_.load(std::memory_order_acquire) > 0) {
+  if (manual_compaction_paused_.load(std::memory_order_seq_cst) > 0) {
     return Status::Incomplete(Status::SubCode::kManualCompactionPaused);
   }
 
@@ -1717,11 +1717,11 @@ void DBImpl::NotifyOnCompactionBegin(ColumnFamilyData* cfd, Compaction* c,
     return;
   }
   mutex_.AssertHeld();
-  if (shutting_down_.load(std::memory_order_acquire)) {
+  if (shutting_down_.load(std::memory_order_seq_cst)) {
     return;
   }
   if (c->is_manual_compaction() &&
-      manual_compaction_paused_.load(std::memory_order_acquire) > 0) {
+      manual_compaction_paused_.load(std::memory_order_seq_cst) > 0) {
     return;
   }
 
@@ -1747,7 +1747,7 @@ void DBImpl::NotifyOnCompactionCompleted(
     return;
   }
   mutex_.AssertHeld();
-  if (shutting_down_.load(std::memory_order_acquire)) {
+  if (shutting_down_.load(std::memory_order_seq_cst)) {
     return;
   }
 
@@ -2641,7 +2641,7 @@ Status DBImpl::WaitUntilFlushWouldNotStallWrites(ColumnFamilyData* cfd,
       if (cfd->IsDropped()) {
         return Status::ColumnFamilyDropped();
       }
-      if (shutting_down_.load(std::memory_order_acquire)) {
+      if (shutting_down_.load(std::memory_order_seq_cst)) {
         return Status::ShutdownInProgress();
       }
 
@@ -2706,7 +2706,7 @@ Status DBImpl::WaitForFlushMemTables(
   // If the caller is trying to resume from bg error, then
   // error_handler_.IsDBStopped() is true.
   while (resuming_from_bg_err || !error_handler_.IsDBStopped()) {
-    if (shutting_down_.load(std::memory_order_acquire)) {
+    if (shutting_down_.load(std::memory_order_seq_cst)) {
       s = Status::ShutdownInProgress();
       return s;
     }
@@ -2776,7 +2776,7 @@ Status DBImpl::EnableAutoCompaction(
 // user-provided canceled variable in CompactRangeOptions
 void DBImpl::DisableManualCompaction() {
   InstrumentedMutexLock l(&mutex_);
-  manual_compaction_paused_.fetch_add(1, std::memory_order_release);
+  manual_compaction_paused_.fetch_add(1, std::memory_order_seq_cst);
 
   // Mark the canceled as true when the cancellation is triggered by
   // manual_compaction_paused (may overwrite user-provided `canceled`)
@@ -2804,7 +2804,7 @@ void DBImpl::DisableManualCompaction() {
 void DBImpl::EnableManualCompaction() {
   InstrumentedMutexLock l(&mutex_);
   assert(manual_compaction_paused_ > 0);
-  manual_compaction_paused_.fetch_sub(1, std::memory_order_release);
+  manual_compaction_paused_.fetch_sub(1, std::memory_order_seq_cst);
 }
 
 void DBImpl::MaybeScheduleFlushOrCompaction() {
@@ -2828,7 +2828,7 @@ void DBImpl::MaybeScheduleFlushOrCompaction() {
     // BackgroundCallFlush() to check flush reason and drop non-recovery
     // flushes.
     return;
-  } else if (shutting_down_.load(std::memory_order_acquire)) {
+  } else if (shutting_down_.load(std::memory_order_seq_cst)) {
     // DB is being deleted; no more background compactions
     return;
   }
@@ -3137,7 +3137,7 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
   // If BG work is stopped due to an error, but a recovery is in progress,
   // that means this flush is part of the recovery. So allow it to go through
   if (!error_handler_.IsBGWorkStopped()) {
-    if (shutting_down_.load(std::memory_order_acquire)) {
+    if (shutting_down_.load(std::memory_order_seq_cst)) {
       status = Status::ShutdownInProgress();
     }
   } else if (!error_handler_.IsRecoveryInProgress()) {
@@ -3523,10 +3523,10 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
   CompactionJobStats compaction_job_stats;
   Status status;
   if (!error_handler_.IsBGWorkStopped()) {
-    if (shutting_down_.load(std::memory_order_acquire)) {
+    if (shutting_down_.load(std::memory_order_seq_cst)) {
       status = Status::ShutdownInProgress();
     } else if (is_manual &&
-               manual_compaction->canceled.load(std::memory_order_acquire)) {
+               manual_compaction->canceled.load(std::memory_order_seq_cst)) {
       status = Status::Incomplete(Status::SubCode::kManualCompactionPaused);
     }
   } else {
@@ -4322,7 +4322,7 @@ Status DBImpl::WaitForCompact(
       return s;
     }
   } else if (wait_for_compact_options.close_db &&
-             has_unpersisted_data_.load(std::memory_order_relaxed) &&
+             has_unpersisted_data_.load(std::memory_order_seq_cst) &&
              !mutable_db_options_.avoid_flush_during_shutdown) {
     Status s =
         DBImpl::FlushAllColumnFamilies(FlushOptions(), FlushReason::kShutDown);
@@ -4334,7 +4334,7 @@ Status DBImpl::WaitForCompact(
   const auto deadline = immutable_db_options_.clock->NowMicros() +
                         wait_for_compact_options.timeout.count();
   for (;;) {
-    if (shutting_down_.load(std::memory_order_acquire)) {
+    if (shutting_down_.load(std::memory_order_seq_cst)) {
       return Status::ShutdownInProgress();
     }
     if (bg_work_paused_ && wait_for_compact_options.abort_on_pause) {

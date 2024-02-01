@@ -297,7 +297,7 @@ Status FlushJob::Run(LogsWithPrepTracker* prep_tracker, FileMetaData* file_meta,
     s = Status::ColumnFamilyDropped("Column family dropped during compaction");
   }
   if ((s.ok() || s.IsColumnFamilyDropped()) &&
-      shutting_down_->load(std::memory_order_acquire)) {
+      shutting_down_->load(std::memory_order_seq_cst)) {
     s = Status::ShutdownInProgress("Database shutdown");
   }
 

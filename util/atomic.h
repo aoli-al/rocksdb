@@ -19,7 +19,7 @@ namespace ROCKSDB_NAMESPACE {
 // "The single total order might not be consistent with happens-before" at
 // https://en.cppreference.com/w/cpp/atomic/memory_order
 // * It's easy to use nonsensical (UB) combinations like store with
-// std::memory_order_acquire.
+// std::memory_order_seq_cst.
 // For such reasons, we provide wrappers below to make safe usage easier.
 
 // Wrapper around std::atomic to avoid certain bugs (see Background above).
@@ -33,33 +33,33 @@ template <typename T>
 class RelaxedAtomic {
  public:
   explicit RelaxedAtomic(T initial = {}) : v_(initial) {}
-  void StoreRelaxed(T desired) { v_.store(desired, std::memory_order_relaxed); }
-  T LoadRelaxed() const { return v_.load(std::memory_order_relaxed); }
+  void StoreRelaxed(T desired) { v_.store(desired, std::memory_order_seq_cst); }
+  T LoadRelaxed() const { return v_.load(std::memory_order_seq_cst); }
   bool CasWeakRelaxed(T& expected, T desired) {
     return v_.compare_exchange_weak(expected, desired,
-                                    std::memory_order_relaxed);
+                                    std::memory_order_seq_cst);
   }
   bool CasStrongRelaxed(T& expected, T desired) {
     return v_.compare_exchange_strong(expected, desired,
-                                      std::memory_order_relaxed);
+                                      std::memory_order_seq_cst);
   }
   T ExchangeRelaxed(T desired) {
-    return v_.exchange(desired, std::memory_order_relaxed);
+    return v_.exchange(desired, std::memory_order_seq_cst);
   }
   T FetchAddRelaxed(T operand) {
-    return v_.fetch_add(operand, std::memory_order_relaxed);
+    return v_.fetch_add(operand, std::memory_order_seq_cst);
   }
   T FetchSubRelaxed(T operand) {
-    return v_.fetch_sub(operand, std::memory_order_relaxed);
+    return v_.fetch_sub(operand, std::memory_order_seq_cst);
   }
   T FetchAndRelaxed(T operand) {
-    return v_.fetch_and(operand, std::memory_order_relaxed);
+    return v_.fetch_and(operand, std::memory_order_seq_cst);
   }
   T FetchOrRelaxed(T operand) {
-    return v_.fetch_or(operand, std::memory_order_relaxed);
+    return v_.fetch_or(operand, std::memory_order_seq_cst);
   }
   T FetchXorRelaxed(T operand) {
-    return v_.fetch_xor(operand, std::memory_order_relaxed);
+    return v_.fetch_xor(operand, std::memory_order_seq_cst);
   }
 
  protected:
@@ -75,36 +75,36 @@ class AcqRelAtomic : public RelaxedAtomic<T> {
  public:
   explicit AcqRelAtomic(T initial = {}) : RelaxedAtomic<T>(initial) {}
   void Store(T desired) {
-    RelaxedAtomic<T>::v_.store(desired, std::memory_order_release);
+    RelaxedAtomic<T>::v_.store(desired, std::memory_order_seq_cst);
   }
   T Load() const {
-    return RelaxedAtomic<T>::v_.load(std::memory_order_acquire);
+    return RelaxedAtomic<T>::v_.load(std::memory_order_seq_cst);
   }
   bool CasWeak(T& expected, T desired) {
     return RelaxedAtomic<T>::v_.compare_exchange_weak(
-        expected, desired, std::memory_order_acq_rel);
+        expected, desired, std::memory_order_seq_cst);
   }
   bool CasStrong(T& expected, T desired) {
     return RelaxedAtomic<T>::v_.compare_exchange_strong(
-        expected, desired, std::memory_order_acq_rel);
+        expected, desired, std::memory_order_seq_cst);
   }
   T Exchange(T desired) {
-    return RelaxedAtomic<T>::v_.exchange(desired, std::memory_order_acq_rel);
+    return RelaxedAtomic<T>::v_.exchange(desired, std::memory_order_seq_cst);
   }
   T FetchAdd(T operand) {
-    return RelaxedAtomic<T>::v_.fetch_add(operand, std::memory_order_acq_rel);
+    return RelaxedAtomic<T>::v_.fetch_add(operand, std::memory_order_seq_cst);
   }
   T FetchSub(T operand) {
-    return RelaxedAtomic<T>::v_.fetch_sub(operand, std::memory_order_acq_rel);
+    return RelaxedAtomic<T>::v_.fetch_sub(operand, std::memory_order_seq_cst);
   }
   T FetchAnd(T operand) {
-    return RelaxedAtomic<T>::v_.fetch_and(operand, std::memory_order_acq_rel);
+    return RelaxedAtomic<T>::v_.fetch_and(operand, std::memory_order_seq_cst);
   }
   T FetchOr(T operand) {
-    return RelaxedAtomic<T>::v_.fetch_or(operand, std::memory_order_acq_rel);
+    return RelaxedAtomic<T>::v_.fetch_or(operand, std::memory_order_seq_cst);
   }
   T FetchXor(T operand) {
-    return RelaxedAtomic<T>::v_.fetch_xor(operand, std::memory_order_acq_rel);
+    return RelaxedAtomic<T>::v_.fetch_xor(operand, std::memory_order_seq_cst);
   }
 };
 

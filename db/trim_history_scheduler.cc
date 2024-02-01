@@ -15,7 +15,7 @@ void TrimHistoryScheduler::ScheduleWork(ColumnFamilyData* cfd) {
   std::lock_guard<std::mutex> lock(checking_mutex_);
   cfd->Ref();
   cfds_.push_back(cfd);
-  is_empty_.store(false, std::memory_order_relaxed);
+  is_empty_.store(false, std::memory_order_seq_cst);
 }
 
 ColumnFamilyData* TrimHistoryScheduler::TakeNextColumnFamily() {
@@ -27,7 +27,7 @@ ColumnFamilyData* TrimHistoryScheduler::TakeNextColumnFamily() {
     ColumnFamilyData* cfd = cfds_.back();
     cfds_.pop_back();
     if (cfds_.empty()) {
-      is_empty_.store(true, std::memory_order_relaxed);
+      is_empty_.store(true, std::memory_order_seq_cst);
     }
 
     if (!cfd->IsDropped()) {
@@ -39,7 +39,7 @@ ColumnFamilyData* TrimHistoryScheduler::TakeNextColumnFamily() {
 }
 
 bool TrimHistoryScheduler::Empty() {
-  bool is_empty = is_empty_.load(std::memory_order_relaxed);
+  bool is_empty = is_empty_.load(std::memory_order_seq_cst);
   return is_empty;
 }
 

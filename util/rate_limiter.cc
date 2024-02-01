@@ -101,10 +101,10 @@ void GenericRateLimiter::SetBytesPerSecond(int64_t bytes_per_second) {
 
 void GenericRateLimiter::SetBytesPerSecondLocked(int64_t bytes_per_second) {
   assert(bytes_per_second > 0);
-  rate_bytes_per_sec_.store(bytes_per_second, std::memory_order_relaxed);
+  rate_bytes_per_sec_.store(bytes_per_second, std::memory_order_seq_cst);
   refill_bytes_per_period_.store(
       CalculateRefillBytesPerPeriodLocked(bytes_per_second),
-      std::memory_order_relaxed);
+      std::memory_order_seq_cst);
 }
 
 Status GenericRateLimiter::SetSingleBurstBytes(int64_t single_burst_bytes) {
@@ -119,14 +119,14 @@ Status GenericRateLimiter::SetSingleBurstBytes(int64_t single_burst_bytes) {
 }
 
 void GenericRateLimiter::SetSingleBurstBytesLocked(int64_t single_burst_bytes) {
-  refill_bytes_per_period_.store(single_burst_bytes, std::memory_order_relaxed);
+  refill_bytes_per_period_.store(single_burst_bytes, std::memory_order_seq_cst);
   refill_period_us_.store(CalculateRefillPeriodUsLocked(single_burst_bytes),
-                          std::memory_order_relaxed);
+                          std::memory_order_seq_cst);
 }
 
 void GenericRateLimiter::Request(int64_t bytes, const Env::IOPriority pri,
                                  Statistics* stats) {
-  assert(bytes <= refill_bytes_per_period_.load(std::memory_order_relaxed));
+  assert(bytes <= refill_bytes_per_period_.load(std::memory_order_seq_cst));
   bytes = std::max(static_cast<int64_t>(0), bytes);
   TEST_SYNC_POINT("GenericRateLimiter::Request");
   TEST_SYNC_POINT_CALLBACK("GenericRateLimiter::Request:1",
@@ -138,7 +138,7 @@ void GenericRateLimiter::Request(int64_t bytes, const Env::IOPriority pri,
     std::chrono::microseconds now(NowMicrosMonotonicLocked());
     if (now - tuned_time_ >=
         kRefillsPerTune * std::chrono::microseconds(refill_period_us_.load(
-                              std::memory_order_relaxed))) {
+                              std::memory_order_seq_cst))) {
       Status s = TuneLocked();
       s.PermitUncheckedError();  //**TODO: What to do on error?
     }
@@ -280,10 +280,10 @@ void GenericRateLimiter::RefillBytesAndGrantRequestsLocked() {
   TEST_SYNC_POINT_CALLBACK(
       "GenericRateLimiter::RefillBytesAndGrantRequestsLocked", &request_mutex_);
   next_refill_us_ = NowMicrosMonotonicLocked() +
-                    refill_period_us_.load(std::memory_order_relaxed);
+                    refill_period_us_.load(std::memory_order_seq_cst);
   // Carry over the left over quota from the last period
   auto refill_bytes_per_period =
-      refill_bytes_per_period_.load(std::memory_order_relaxed);
+      refill_bytes_per_period_.load(std::memory_order_seq_cst);
   assert(available_bytes_ == 0);
   available_bytes_ = refill_bytes_per_period;
 
@@ -318,7 +318,7 @@ void GenericRateLimiter::RefillBytesAndGrantRequestsLocked() {
 
 int64_t GenericRateLimiter::CalculateRefillBytesPerPeriodLocked(
     int64_t rate_bytes_per_sec) {
-  int64_t refill_period_us = refill_period_us_.load(std::memory_order_relaxed);
+  int64_t refill_period_us = refill_period_us_.load(std::memory_order_seq_cst);
   if (std::numeric_limits<int64_t>::max() / rate_bytes_per_sec <
       refill_period_us) {
     // Avoid unexpected result in the overflow case. The result now is still
@@ -332,7 +332,7 @@ int64_t GenericRateLimiter::CalculateRefillBytesPerPeriodLocked(
 int64_t GenericRateLimiter::CalculateRefillPeriodUsLocked(
     int64_t single_burst_bytes) {
   int64_t rate_bytes_per_sec =
-      rate_bytes_per_sec_.load(std::memory_order_relaxed);
+      rate_bytes_per_sec_.load(std::memory_order_seq_cst);
   if (std::numeric_limits<int64_t>::max() / single_burst_bytes <
       kMicrosecondsPerSecond) {
     // Avoid unexpected result in the overflow case. The result now is still
@@ -354,7 +354,7 @@ Status GenericRateLimiter::TuneLocked() {
   std::chrono::microseconds prev_tuned_time = tuned_time_;
   tuned_time_ = std::chrono::microseconds(NowMicrosMonotonicLocked());
 
-  int64_t refill_period_us = refill_period_us_.load(std::memory_order_relaxed);
+  int64_t refill_period_us = refill_period_us_.load(std::memory_order_seq_cst);
   int64_t elapsed_intervals = (tuned_time_ - prev_tuned_time +
                                std::chrono::microseconds(refill_period_us) -
                                std::chrono::microseconds(1)) /

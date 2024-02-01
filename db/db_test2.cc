@@ -2356,7 +2356,7 @@ class MockPersistentCache : public PersistentCache {
   }
 
   uint64_t NewId() override {
-    return last_id_.fetch_add(1, std::memory_order_relaxed);
+    return last_id_.fetch_add(1, std::memory_order_seq_cst);
   }
 
   Status Insert(const Slice& page_key, const char* data,
@@ -3017,7 +3017,7 @@ TEST_F(DBTest2, PausingManualCompaction1) {
         // CompactRange triggers manual compaction and cancel the compaction
         // by set *canceled as true
         if (canceled != nullptr) {
-          canceled->store(true, std::memory_order_release);
+          canceled->store(true, std::memory_order_seq_cst);
         }
         manual_compactions_paused += 1;
       });
@@ -3026,8 +3026,8 @@ TEST_F(DBTest2, PausingManualCompaction1) {
         auto paused = static_cast<std::atomic<int>*>(arg);
         // CompactFiles() relies on manual_compactions_paused to
         // determine if thie compaction should be paused or not
-        ASSERT_EQ(0, paused->load(std::memory_order_acquire));
-        paused->fetch_add(1, std::memory_order_release);
+        ASSERT_EQ(0, paused->load(std::memory_order_seq_cst));
+        paused->fetch_add(1, std::memory_order_seq_cst);
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
 
@@ -3187,7 +3187,7 @@ TEST_F(DBTest2, PausingManualCompaction4) {
         // CompactRange triggers manual compaction and cancel the compaction
         // by set *canceled as true
         if (canceled != nullptr) {
-          canceled->store(true, std::memory_order_release);
+          canceled->store(true, std::memory_order_seq_cst);
         }
         run_manual_compactions++;
       });
@@ -3196,8 +3196,8 @@ TEST_F(DBTest2, PausingManualCompaction4) {
         auto paused = static_cast<std::atomic<int>*>(arg);
         // CompactFiles() relies on manual_compactions_paused to
         // determine if thie compaction should be paused or not
-        ASSERT_EQ(0, paused->load(std::memory_order_acquire));
-        paused->fetch_add(1, std::memory_order_release);
+        ASSERT_EQ(0, paused->load(std::memory_order_seq_cst));
+        paused->fetch_add(1, std::memory_order_seq_cst);
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
 
@@ -3279,11 +3279,11 @@ TEST_F(DBTest2, CancelManualCompaction1) {
         ++compactions_run;
         // After 3 compactions disable
         if (compactions_run == 3) {
-          compact_options.canceled->store(true, std::memory_order_release);
+          compact_options.canceled->store(true, std::memory_order_seq_cst);
         }
       });
 
-  compact_options.canceled->store(false, std::memory_order_release);
+  compact_options.canceled->store(false, std::memory_order_seq_cst);
   ASSERT_TRUE(dbfull()
                   ->CompactRange(compact_options, nullptr, nullptr)
                   .IsManualCompactionPaused());
@@ -3297,7 +3297,7 @@ TEST_F(DBTest2, CancelManualCompaction1) {
       "CompactionJob::Run():PausingManualCompaction:1");
 
   // Compactions should work again if we re-enable them..
-  compact_options.canceled->store(false, std::memory_order_relaxed);
+  compact_options.canceled->store(false, std::memory_order_seq_cst);
   ASSERT_OK(dbfull()->CompactRange(compact_options, nullptr, nullptr));
   ASSERT_OK(dbfull()->TEST_WaitForCompact());
   ASSERT_EQ("0,0,0,0,0,0,2", FilesPerLevel());
@@ -3351,15 +3351,15 @@ TEST_F(DBTest2, CancelManualCompaction2) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionIterator:ProcessKV", [&](void* /*arg*/) {
         int kv_compactions_run =
-            kv_compactions.fetch_add(1, std::memory_order_release);
+            kv_compactions.fetch_add(1, std::memory_order_seq_cst);
         if (kv_compactions_run == 5) {
-          compact_options.canceled->store(true, std::memory_order_release);
+          compact_options.canceled->store(true, std::memory_order_seq_cst);
           kv_compactions_stopped_at = kv_compactions_run;
           compactions_stopped_at = compactions_run;
         }
       });
 
-  compact_options.canceled->store(false, std::memory_order_release);
+  compact_options.canceled->store(false, std::memory_order_seq_cst);
   ASSERT_TRUE(dbfull()
                   ->CompactRange(compact_options, nullptr, nullptr)
                   .IsManualCompactionPaused());
@@ -3379,7 +3379,7 @@ TEST_F(DBTest2, CancelManualCompaction2) {
       "CompactionJob::Run():PausingManualCompaction:1");
 
   // Compactions should work again if we re-enable them..
-  compact_options.canceled->store(false, std::memory_order_relaxed);
+  compact_options.canceled->store(false, std::memory_order_seq_cst);
   ASSERT_OK(dbfull()->CompactRange(compact_options, nullptr, nullptr));
   ASSERT_OK(dbfull()->TEST_WaitForCompact());
   ASSERT_EQ("0,0,0,0,0,0,2", FilesPerLevel());
@@ -3438,7 +3438,7 @@ TEST_F(DBTest2, CancelManualCompactionWithListener) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionIterator:ProcessKV", [&](void* /*arg*/) {
-        compact_options.canceled->store(true, std::memory_order_release);
+        compact_options.canceled->store(true, std::memory_order_seq_cst);
       });
 
   int running_compaction = 0;
@@ -3452,7 +3452,7 @@ TEST_F(DBTest2, CancelManualCompactionWithListener) {
   listener->code_ = Status::kIncomplete;
   listener->subcode_ = Status::SubCode::kManualCompactionPaused;
 
-  compact_options.canceled->store(false, std::memory_order_release);
+  compact_options.canceled->store(false, std::memory_order_seq_cst);
   ASSERT_TRUE(dbfull()
                   ->CompactRange(compact_options, nullptr, nullptr)
                   .IsManualCompactionPaused());
@@ -3485,13 +3485,13 @@ TEST_F(DBTest2, CancelManualCompactionWithListener) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run:BeforeVerify", [&](void* /*arg*/) {
-        compact_options.canceled->store(true, std::memory_order_release);
+        compact_options.canceled->store(true, std::memory_order_seq_cst);
       });
 
   listener->code_ = Status::kOk;
   listener->subcode_ = Status::SubCode::kNone;
 
-  compact_options.canceled->store(false, std::memory_order_release);
+  compact_options.canceled->store(false, std::memory_order_seq_cst);
   ASSERT_OK(dbfull()->CompactRange(compact_options, nullptr, nullptr));
   ASSERT_OK(dbfull()->TEST_WaitForCompact());
 
@@ -6462,11 +6462,11 @@ class RenameCurrentTest : public DBTestBase,
   ~RenameCurrentTest() override = default;
 
   void SetUp() override {
-    env_->no_file_overwrite_.store(true, std::memory_order_release);
+    env_->no_file_overwrite_.store(true, std::memory_order_seq_cst);
   }
 
   void TearDown() override {
-    env_->no_file_overwrite_.store(false, std::memory_order_release);
+    env_->no_file_overwrite_.store(false, std::memory_order_seq_cst);
   }
 
   void SetupSyncPoints() {

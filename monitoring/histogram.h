@@ -55,15 +55,15 @@ struct HistogramStat {
   void Add(uint64_t value);
   void Merge(const HistogramStat& other);
 
-  inline uint64_t min() const { return min_.load(std::memory_order_relaxed); }
-  inline uint64_t max() const { return max_.load(std::memory_order_relaxed); }
-  inline uint64_t num() const { return num_.load(std::memory_order_relaxed); }
-  inline uint64_t sum() const { return sum_.load(std::memory_order_relaxed); }
+  inline uint64_t min() const { return min_.load(std::memory_order_seq_cst); }
+  inline uint64_t max() const { return max_.load(std::memory_order_seq_cst); }
+  inline uint64_t num() const { return num_.load(std::memory_order_seq_cst); }
+  inline uint64_t sum() const { return sum_.load(std::memory_order_seq_cst); }
   inline uint64_t sum_squares() const {
-    return sum_squares_.load(std::memory_order_relaxed);
+    return sum_squares_.load(std::memory_order_seq_cst);
   }
   inline uint64_t bucket_at(size_t b) const {
-    return buckets_[b].load(std::memory_order_relaxed);
+    return buckets_[b].load(std::memory_order_seq_cst);
   }
 
   double Median() const;

@@ -29,7 +29,7 @@ void ExpectedState::Precommit(int cf, int64_t key, const ExpectedValue& value) {
   Value(cf, key).store(value.Read());
   // To prevent low-level instruction reordering that results
   // in db write happens before setting pending state in expected value
-  std::atomic_thread_fence(std::memory_order_release);
+  std::atomic_thread_fence(std::memory_order_seq_cst);
 }
 
 PendingExpectedValue ExpectedState::PreparePut(int cf, int64_t key) {
@@ -94,7 +94,7 @@ void ExpectedState::Reset() {
   const uint32_t del_mask = ExpectedValue::GetDelMask();
   for (size_t i = 0; i < num_column_families_; ++i) {
     for (size_t j = 0; j < max_key_; ++j) {
-      Value(static_cast<int>(i), j).store(del_mask, std::memory_order_relaxed);
+      Value(static_cast<int>(i), j).store(del_mask, std::memory_order_seq_cst);
     }
   }
 }

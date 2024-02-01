@@ -75,7 +75,7 @@ size_t ShardedCacheBase::GetPerShardCapacity() const {
 }
 
 uint64_t ShardedCacheBase::NewId() {
-  return last_id_.fetch_add(1, std::memory_order_relaxed);
+  return last_id_.fetch_add(1, std::memory_order_seq_cst);
 }
 
 size_t ShardedCacheBase::GetCapacity() const {

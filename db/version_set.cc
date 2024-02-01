@@ -1814,7 +1814,7 @@ void Version::GetColumnFamilyMetaData(ColumnFamilyMetaData* cf_meta) {
           file->fd.GetFileSize(), file->fd.smallest_seqno,
           file->fd.largest_seqno, file->smallest.user_key().ToString(),
           file->largest.user_key().ToString(),
-          file->stats.num_reads_sampled.load(std::memory_order_relaxed),
+          file->stats.num_reads_sampled.load(std::memory_order_seq_cst),
           file->being_compacted, file->temperature,
           file->oldest_blob_file_number, file->TryGetOldestAncesterTime(),
           file->TryGetFileCreationTime(), file->epoch_number,
@@ -4981,7 +4981,7 @@ std::string Version::DebugString(bool hex, bool print_stats) const {
       if (print_stats) {
         r.append("(");
         r.append(std::to_string(
-            files[i]->stats.num_reads_sampled.load(std::memory_order_relaxed)));
+            files[i]->stats.num_reads_sampled.load(std::memory_order_seq_cst)));
         r.append(")");
       }
       r.append("\n");
@@ -6525,15 +6525,15 @@ Status VersionSet::DumpManifest(
 void VersionSet::MarkFileNumberUsed(uint64_t number) {
   // only called during recovery and repair which are single threaded, so this
   // works because there can't be concurrent calls
-  if (next_file_number_.load(std::memory_order_relaxed) <= number) {
-    next_file_number_.store(number + 1, std::memory_order_relaxed);
+  if (next_file_number_.load(std::memory_order_seq_cst) <= number) {
+    next_file_number_.store(number + 1, std::memory_order_seq_cst);
   }
 }
 // Called only either from ::LogAndApply which is protected by mutex or during
 // recovery which is single-threaded.
 void VersionSet::MarkMinLogNumberToKeep(uint64_t number) {
-  if (min_log_number_to_keep_.load(std::memory_order_relaxed) < number) {
-    min_log_number_to_keep_.store(number, std::memory_order_relaxed);
+  if (min_log_number_to_keep_.load(std::memory_order_seq_cst) < number) {
+    min_log_number_to_keep_.store(number, std::memory_order_seq_cst);
   }
 }
 
@@ -7158,7 +7158,7 @@ void VersionSet::GetLiveFilesMetaData(std::vector<LiveFileMetaData>* metadata) {
         filemetadata.smallest_seqno = file->fd.smallest_seqno;
         filemetadata.largest_seqno = file->fd.largest_seqno;
         filemetadata.num_reads_sampled =
-            file->stats.num_reads_sampled.load(std::memory_order_relaxed);
+            file->stats.num_reads_sampled.load(std::memory_order_seq_cst);
         filemetadata.being_compacted = file->being_compacted;
         filemetadata.num_entries = file->num_entries;
         filemetadata.num_deletions = file->num_deletions;

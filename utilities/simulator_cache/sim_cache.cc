@@ -279,16 +279,16 @@ class SimCacheImpl : public SimCache {
   }
 
   uint64_t get_miss_counter() const override {
-    return miss_times_.load(std::memory_order_relaxed);
+    return miss_times_.load(std::memory_order_seq_cst);
   }
 
   uint64_t get_hit_counter() const override {
-    return hit_times_.load(std::memory_order_relaxed);
+    return hit_times_.load(std::memory_order_seq_cst);
   }
 
   void reset_counter() override {
-    miss_times_.store(0, std::memory_order_relaxed);
-    hit_times_.store(0, std::memory_order_relaxed);
+    miss_times_.store(0, std::memory_order_seq_cst);
+    hit_times_.store(0, std::memory_order_seq_cst);
     SetTickerCount(stats_, SIM_BLOCK_CACHE_HIT, 0);
     SetTickerCount(stats_, SIM_BLOCK_CACHE_MISS, 0);
   }
@@ -333,9 +333,9 @@ class SimCacheImpl : public SimCache {
   CacheActivityLogger cache_activity_logger_;
 
   void inc_miss_counter() {
-    miss_times_.fetch_add(1, std::memory_order_relaxed);
+    miss_times_.fetch_add(1, std::memory_order_seq_cst);
   }
-  void inc_hit_counter() { hit_times_.fetch_add(1, std::memory_order_relaxed); }
+  void inc_hit_counter() { hit_times_.fetch_add(1, std::memory_order_seq_cst); }
 
   void HandleLookup(const Slice& key, Statistics* stats) {
     Handle* h = key_only_cache_->Lookup(key);

@@ -1223,7 +1223,7 @@ void MultiOpsTxnsStressTest::VerifyDb(ThreadState* thread) const {
 // Caller has to make sure that the race condition does not happen.
 void MultiOpsTxnsStressTest::VerifyPkSkFast(const ReadOptions& read_options,
                                             int job_id) {
-  DB* const db = db_aptr_.load(std::memory_order_acquire);
+  DB* const db = db_aptr_.load(std::memory_order_seq_cst);
   if (db == nullptr) {
     return;
   }

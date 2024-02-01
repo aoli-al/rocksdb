@@ -215,7 +215,7 @@ TEST_F(MemTableListTest, Empty) {
   MemTableList list(1, 0, 0);
 
   ASSERT_EQ(0, list.NumNotFlushed());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
   ASSERT_FALSE(list.IsFlushPending());
 
   autovector<MemTable*> mems;
@@ -639,7 +639,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
 
   // Nothing to flush
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
   autovector<MemTable*> to_flush;
   list.PickMemtablesToFlush(
       std::numeric_limits<uint64_t>::max() /* memtable_id */, &to_flush);
@@ -648,20 +648,20 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   // Request a flush even though there is nothing to flush
   list.FlushRequested();
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Attempt to 'flush' to clear request for flush
   list.PickMemtablesToFlush(
       std::numeric_limits<uint64_t>::max() /* memtable_id */, &to_flush);
   ASSERT_EQ(0, to_flush.size());
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Request a flush again
   list.FlushRequested();
   // No flush pending since the list is empty.
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Add 2 tables
   list.Add(tables[0], &to_delete);
@@ -673,7 +673,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   // pending since we had previously requested a flush and never called
   // PickMemtablesToFlush() to clear the flush.
   ASSERT_TRUE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Pick tables to flush
   list.PickMemtablesToFlush(
@@ -681,12 +681,12 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   ASSERT_EQ(2, to_flush.size());
   ASSERT_EQ(2, list.NumNotFlushed());
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Revert flush
   list.RollbackMemtableFlush(to_flush, false);
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_seq_cst));
   to_flush.clear();
 
   // Add another table
@@ -694,7 +694,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   // We now have the minimum to flush regardles of whether FlushRequested()
   // was called.
   ASSERT_TRUE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_seq_cst));
   ASSERT_EQ(0, to_delete.size());
 
   // Pick tables to flush
@@ -703,7 +703,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   ASSERT_EQ(3, to_flush.size());
   ASSERT_EQ(3, list.NumNotFlushed());
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Pick tables to flush again
   autovector<MemTable*> to_flush2;
@@ -712,18 +712,18 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   ASSERT_EQ(0, to_flush2.size());
   ASSERT_EQ(3, list.NumNotFlushed());
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Add another table
   list.Add(tables[3], &to_delete);
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_seq_cst));
   ASSERT_EQ(0, to_delete.size());
 
   // Request a flush again
   list.FlushRequested();
   ASSERT_TRUE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Pick tables to flush again
   list.PickMemtablesToFlush(
@@ -731,12 +731,12 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   ASSERT_EQ(1, to_flush2.size());
   ASSERT_EQ(4, list.NumNotFlushed());
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Rollback first pick of tables
   list.RollbackMemtableFlush(to_flush, false);
   ASSERT_TRUE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_seq_cst));
   to_flush.clear();
 
   // Add another tables
@@ -744,7 +744,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   ASSERT_EQ(5, list.NumNotFlushed());
   // We now have the minimum to flush regardles of whether FlushRequested()
   ASSERT_TRUE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_seq_cst));
   ASSERT_EQ(0, to_delete.size());
 
   // Pick tables to flush
@@ -756,7 +756,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   ASSERT_EQ(3, to_flush.size());
   ASSERT_EQ(5, list.NumNotFlushed());
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Pick tables to flush again
   autovector<MemTable*> to_flush3;
@@ -766,7 +766,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   ASSERT_EQ(1, to_flush3.size());
   ASSERT_EQ(5, list.NumNotFlushed());
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Nothing left to flush
   autovector<MemTable*> to_flush4;
@@ -775,7 +775,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   ASSERT_EQ(0, to_flush4.size());
   ASSERT_EQ(5, list.NumNotFlushed());
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Flush the 3 memtables that were picked in to_flush
   s = Mock_InstallMemtableFlushResults(&list, mutable_cf_options, to_flush,
@@ -797,7 +797,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   // Request a flush again. Should be nothing to flush
   list.FlushRequested();
   ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
 
   // Flush the 1 memtable (tables[4]) that was picked in to_flush3
   s = MemTableListTest::Mock_InstallMemtableFlushResults(
@@ -845,7 +845,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   list.PickMemtablesToFlush(memtable_id, &to_flush5);
   ASSERT_TRUE(to_flush5.empty());
   ASSERT_EQ(1, list.NumNotFlushed());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_seq_cst));
   ASSERT_FALSE(list.IsFlushPending());
   ASSERT_FALSE(list.HasFlushRequested());
 
@@ -856,7 +856,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   list.PickMemtablesToFlush(memtable_id, &to_flush5);
   ASSERT_EQ(1, static_cast<int>(to_flush5.size()));
   ASSERT_EQ(1, list.NumNotFlushed());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_seq_cst));
   ASSERT_FALSE(list.IsFlushPending());
   to_delete.clear();
 
@@ -949,7 +949,7 @@ TEST_F(MemTableListTest, AtomicFlushTest) {
   for (auto i = 0; i != num_cfs; ++i) {
     auto* list = lists[i];
     ASSERT_FALSE(list->IsFlushPending());
-    ASSERT_FALSE(list->imm_flush_needed.load(std::memory_order_acquire));
+    ASSERT_FALSE(list->imm_flush_needed.load(std::memory_order_seq_cst));
     list->PickMemtablesToFlush(
         std::numeric_limits<uint64_t>::max() /* memtable_id */,
         &flush_candidates[i]);
@@ -960,7 +960,7 @@ TEST_F(MemTableListTest, AtomicFlushTest) {
     auto* list = lists[i];
     list->FlushRequested();
     ASSERT_FALSE(list->IsFlushPending());
-    ASSERT_FALSE(list->imm_flush_needed.load(std::memory_order_acquire));
+    ASSERT_FALSE(list->imm_flush_needed.load(std::memory_order_seq_cst));
   }
   autovector<MemTable*> to_delete;
   // Add tables to the immutable memtalbe lists associated with column families
@@ -970,7 +970,7 @@ TEST_F(MemTableListTest, AtomicFlushTest) {
     }
     ASSERT_EQ(num_tables_per_cf, lists[i]->NumNotFlushed());
     ASSERT_TRUE(lists[i]->IsFlushPending());
-    ASSERT_TRUE(lists[i]->imm_flush_needed.load(std::memory_order_acquire));
+    ASSERT_TRUE(lists[i]->imm_flush_needed.load(std::memory_order_seq_cst));
   }
   std::vector<uint64_t> flush_memtable_ids = {1, 1, 0};
   //          +----+

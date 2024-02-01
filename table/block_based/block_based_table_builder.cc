@@ -365,8 +365,8 @@ struct BlockBasedTableBuilder::Rep {
   // See class Footer
   uint32_t base_context_checksum;
 
-  uint64_t get_offset() { return offset.load(std::memory_order_relaxed); }
-  void set_offset(uint64_t o) { offset.store(o, std::memory_order_relaxed); }
+  uint64_t get_offset() { return offset.load(std::memory_order_seq_cst); }
+  void set_offset(uint64_t o) { offset.store(o, std::memory_order_seq_cst); }
 
   bool IsParallelCompressionEnabled() const {
     return compression_opts.parallel_threads > 1;
@@ -376,7 +376,7 @@ struct BlockBasedTableBuilder::Rep {
     // We need to make modifications of status visible when status_ok is set
     // to false, and this is ensured by status_mutex, so no special memory
     // order for status_ok is required.
-    if (status_ok.load(std::memory_order_relaxed)) {
+    if (status_ok.load(std::memory_order_seq_cst)) {
       return Status::OK();
     } else {
       return CopyStatus();
@@ -392,7 +392,7 @@ struct BlockBasedTableBuilder::Rep {
     // We need to make modifications of io_status visible when status_ok is set
     // to false, and this is ensured by io_status_mutex, so no special memory
     // order for io_status_ok is required.
-    if (io_status_ok.load(std::memory_order_relaxed)) {
+    if (io_status_ok.load(std::memory_order_seq_cst)) {
 #ifdef ROCKSDB_ASSERT_STATUS_CHECKED  // Avoid unnecessary lock acquisition
       auto ios = CopyIOStatus();
       ios.PermitUncheckedError();
@@ -412,26 +412,26 @@ struct BlockBasedTableBuilder::Rep {
 
   // Never erase an existing status that is not OK.
   void SetStatus(Status s) {
-    if (!s.ok() && status_ok.load(std::memory_order_relaxed)) {
+    if (!s.ok() && status_ok.load(std::memory_order_seq_cst)) {
       // Locking is an overkill for non compression_opts.parallel_threads
       // case but since it's unlikely that s is not OK, we take this cost
       // to be simplicity.
       std::lock_guard<std::mutex> lock(status_mutex);
       status = s;
-      status_ok.store(false, std::memory_order_relaxed);
+      status_ok.store(false, std::memory_order_seq_cst);
     }
   }
 
   // Never erase an existing I/O status that is not OK.
   // Calling this will also SetStatus(ios)
   void SetIOStatus(IOStatus ios) {
-    if (!ios.ok() && io_status_ok.load(std::memory_order_relaxed)) {
+    if (!ios.ok() && io_status_ok.load(std::memory_order_seq_cst)) {
       // Locking is an overkill for non compression_opts.parallel_threads
       // case but since it's unlikely that s is not OK, we take this cost
       // to be simplicity.
       std::lock_guard<std::mutex> lock(io_status_mutex);
       io_status = ios;
-      io_status_ok.store(false, std::memory_order_relaxed);
+      io_status_ok.store(false, std::memory_order_seq_cst);
     }
     SetStatus(ios);
   }
@@ -735,7 +735,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
   // Estimate output file size when parallel compression is enabled. This is
   // necessary because compression & flush are no longer synchronized,
   // and BlockBasedTableBuilder::FileSize() is no longer accurate.
-  // memory_order_relaxed suffices because accurate statistics is not required.
+  // memory_order_seq_cst suffices because accurate statistics is not required.
   class FileSizeEstimator {
    public:
     explicit FileSizeEstimator()
@@ -752,19 +752,19 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
     void EmitBlock(uint64_t uncomp_block_size, uint64_t curr_file_size) {
       uint64_t new_uncomp_bytes_inflight =
           uncomp_bytes_inflight.fetch_add(uncomp_block_size,
-                                          std::memory_order_relaxed) +
+                                          std::memory_order_seq_cst) +
           uncomp_block_size;
 
       uint64_t new_blocks_inflight =
-          blocks_inflight.fetch_add(1, std::memory_order_relaxed) + 1;
+          blocks_inflight.fetch_add(1, std::memory_order_seq_cst) + 1;
 
       estimated_file_size.store(
           curr_file_size +
               static_cast<uint64_t>(
                   static_cast<double>(new_uncomp_bytes_inflight) *
-                  curr_compression_ratio.load(std::memory_order_relaxed)) +
+                  curr_compression_ratio.load(std::memory_order_seq_cst)) +
               new_blocks_inflight * kBlockTrailerSize,
-          std::memory_order_relaxed);
+          std::memory_order_seq_cst);
     }
 
     // Estimate file size when a block is already reaped from
@@ -777,38 +777,38 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
       assert(new_uncomp_bytes_compressed > 0);
 
       curr_compression_ratio.store(
-          (curr_compression_ratio.load(std::memory_order_relaxed) *
+          (curr_compression_ratio.load(std::memory_order_seq_cst) *
                uncomp_bytes_compressed +
            compressed_block_size) /
               static_cast<double>(new_uncomp_bytes_compressed),
-          std::memory_order_relaxed);
+          std::memory_order_seq_cst);
       uncomp_bytes_compressed = new_uncomp_bytes_compressed;
 
       uint64_t new_uncomp_bytes_inflight =
           uncomp_bytes_inflight.fetch_sub(uncomp_bytes_curr_block,
-                                          std::memory_order_relaxed) -
+                                          std::memory_order_seq_cst) -
           uncomp_bytes_curr_block;
 
       uint64_t new_blocks_inflight =
-          blocks_inflight.fetch_sub(1, std::memory_order_relaxed) - 1;
+          blocks_inflight.fetch_sub(1, std::memory_order_seq_cst) - 1;
 
       estimated_file_size.store(
           curr_file_size +
               static_cast<uint64_t>(
                   static_cast<double>(new_uncomp_bytes_inflight) *
-                  curr_compression_ratio.load(std::memory_order_relaxed)) +
+                  curr_compression_ratio.load(std::memory_order_seq_cst)) +
               new_blocks_inflight * kBlockTrailerSize,
-          std::memory_order_relaxed);
+          std::memory_order_seq_cst);
 
       uncomp_bytes_curr_block_set = false;
     }
 
     void SetEstimatedFileSize(uint64_t size) {
-      estimated_file_size.store(size, std::memory_order_relaxed);
+      estimated_file_size.store(size, std::memory_order_seq_cst);
     }
 
     uint64_t GetEstimatedFileSize() {
-      return estimated_file_size.load(std::memory_order_relaxed);
+      return estimated_file_size.load(std::memory_order_seq_cst);
     }
 
     void SetCurrBlockUncompSize(uint64_t size) {
@@ -905,10 +905,10 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
       return;
     }
 
-    if (!first_block_processed.load(std::memory_order_relaxed)) {
+    if (!first_block_processed.load(std::memory_order_seq_cst)) {
       std::unique_lock<std::mutex> lock(first_block_mutex);
       first_block_cond.wait(lock, [this] {
-        return first_block_processed.load(std::memory_order_relaxed);
+        return first_block_processed.load(std::memory_order_seq_cst);
       });
     }
   }
@@ -919,9 +919,9 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
     block_rep->compressed_data->clear();
     block_rep_pool.push(block_rep);
 
-    if (!first_block_processed.load(std::memory_order_relaxed)) {
+    if (!first_block_processed.load(std::memory_order_seq_cst)) {
       std::lock_guard<std::mutex> lock(first_block_mutex);
-      first_block_processed.store(true, std::memory_order_relaxed);
+      first_block_processed.store(true, std::memory_order_seq_cst);
       first_block_cond.notify_one();
     }
   }
@@ -1213,7 +1213,7 @@ void BlockBasedTableBuilder::CompressAndVerifyBlock(
 
     if (is_data_block) {
       r->compressible_input_data_bytes.fetch_add(uncompressed_block_data.size(),
-                                                 std::memory_order_relaxed);
+                                                 std::memory_order_seq_cst);
     }
     const CompressionDict* compression_dict;
     if (!is_data_block || r->compression_dict == nullptr) {
@@ -1237,11 +1237,11 @@ void BlockBasedTableBuilder::CompressAndVerifyBlock(
       // Currently compression sampling is only enabled for data block.
       assert(is_data_block);
       r->sampled_input_data_bytes.fetch_add(uncompressed_block_data.size(),
-                                            std::memory_order_relaxed);
+                                            std::memory_order_seq_cst);
       r->sampled_output_slow_data_bytes.fetch_add(sampled_output_slow.size(),
-                                                  std::memory_order_relaxed);
+                                                  std::memory_order_seq_cst);
       r->sampled_output_fast_data_bytes.fetch_add(sampled_output_fast.size(),
-                                                  std::memory_order_relaxed);
+                                                  std::memory_order_seq_cst);
     }
     // notify collectors on block add
     NotifyCollectTableCollectorsOnBlockAdd(
@@ -1292,13 +1292,13 @@ void BlockBasedTableBuilder::CompressAndVerifyBlock(
     // Status is not OK, or block is too big to be compressed.
     if (is_data_block) {
       r->uncompressible_input_data_bytes.fetch_add(
-          uncompressed_block_data.size(), std::memory_order_relaxed);
+          uncompressed_block_data.size(), std::memory_order_seq_cst);
     }
     *type = kNoCompression;
   }
   if (is_data_block) {
     r->uncompressible_input_data_bytes.fetch_add(kBlockTrailerSize,
-                                                 std::memory_order_relaxed);
+                                                 std::memory_order_seq_cst);
   }
 
   // Abort compression if the block is too big, or did not pass

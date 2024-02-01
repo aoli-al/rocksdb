@@ -32,7 +32,7 @@ TEST_F(DBIOFailureTest, DropWrites) {
     Compact("a", "z");
     const size_t num_files = CountFiles();
     // Force out-of-space errors
-    env_->drop_writes_.store(true, std::memory_order_release);
+    env_->drop_writes_.store(true, std::memory_order_seq_cst);
     env_->sleep_counter_.Reset();
     env_->SetMockSleep();
     for (int i = 0; i < 5; i++) {
@@ -58,7 +58,7 @@ TEST_F(DBIOFailureTest, DropWrites) {
     ASSERT_TRUE(db_->GetProperty("rocksdb.background-errors", &property_value));
     ASSERT_EQ("5", property_value);
 
-    env_->drop_writes_.store(false, std::memory_order_release);
+    env_->drop_writes_.store(false, std::memory_order_seq_cst);
     const size_t count = CountFiles();
     ASSERT_LT(count, num_files + 3);
 
@@ -79,7 +79,7 @@ TEST_F(DBIOFailureTest, DropWritesFlush) {
 
     ASSERT_OK(Put("foo", "v1"));
     // Force out-of-space errors
-    env_->drop_writes_.store(true, std::memory_order_release);
+    env_->drop_writes_.store(true, std::memory_order_seq_cst);
 
     std::string property_value;
     // Background error count is 0 now.
@@ -92,7 +92,7 @@ TEST_F(DBIOFailureTest, DropWritesFlush) {
     ASSERT_TRUE(db_->GetProperty("rocksdb.background-errors", &property_value));
     ASSERT_EQ("1", property_value);
 
-    env_->drop_writes_.store(false, std::memory_order_release);
+    env_->drop_writes_.store(false, std::memory_order_seq_cst);
   } while (ChangeCompactOptions());
 }
 
@@ -112,14 +112,14 @@ TEST_F(DBIOFailureTest, NoSpaceCompactRange) {
     }
 
     // Force out-of-space errors
-    env_->no_space_.store(true, std::memory_order_release);
+    env_->no_space_.store(true, std::memory_order_seq_cst);
 
     Status s = dbfull()->TEST_CompactRange(0, nullptr, nullptr, nullptr,
                                            true /* disallow trivial move */);
     ASSERT_TRUE(s.IsIOError());
     ASSERT_TRUE(s.IsNoSpace());
 
-    env_->no_space_.store(false, std::memory_order_release);
+    env_->no_space_.store(false, std::memory_order_seq_cst);
   } while (ChangeCompactOptions());
 }
 
@@ -176,12 +176,12 @@ TEST_F(DBIOFailureTest, ManifestWriteError) {
     ASSERT_EQ(NumTableFilesAtLevel(last), 1);  // foo=>bar is now in last level
 
     // Merging compaction (will fail)
-    error_type->store(true, std::memory_order_release);
+    error_type->store(true, std::memory_order_seq_cst);
     ASSERT_NOK(
         dbfull()->TEST_CompactRange(last, nullptr, nullptr));  // Should fail
     ASSERT_EQ("bar", Get("foo"));
 
-    error_type->store(false, std::memory_order_release);
+    error_type->store(false, std::memory_order_seq_cst);
 
     // Since paranoid_checks=true, writes should fail
     ASSERT_NOK(Put("foo2", "bar2"));
@@ -195,7 +195,7 @@ TEST_F(DBIOFailureTest, ManifestWriteError) {
     Reopen(options);
 
     // Merging compaction (will fail)
-    error_type->store(true, std::memory_order_release);
+    error_type->store(true, std::memory_order_seq_cst);
     Status s =
         dbfull()->TEST_CompactRange(last, nullptr, nullptr);  // Should fail
     if (iter == 0) {
@@ -206,7 +206,7 @@ TEST_F(DBIOFailureTest, ManifestWriteError) {
     ASSERT_EQ("bar", Get("foo"));
 
     // Recovery: should not lose data
-    error_type->store(false, std::memory_order_release);
+    error_type->store(false, std::memory_order_seq_cst);
     Reopen(options);
     ASSERT_EQ("bar", Get("foo"));
 
@@ -234,9 +234,9 @@ TEST_F(DBIOFailureTest, PutFailsParanoid) {
   ASSERT_OK(Put(1, "foo", "bar"));
   ASSERT_OK(Put(1, "foo1", "bar1"));
   // simulate error
-  env_->log_write_error_.store(true, std::memory_order_release);
+  env_->log_write_error_.store(true, std::memory_order_seq_cst);
   ASSERT_NOK(Put(1, "foo2", "bar2"));
-  env_->log_write_error_.store(false, std::memory_order_release);
+  env_->log_write_error_.store(false, std::memory_order_seq_cst);
   // the next put should fail, too
   ASSERT_NOK(Put(1, "foo3", "bar3"));
   // but we're still able to read
@@ -250,9 +250,9 @@ TEST_F(DBIOFailureTest, PutFailsParanoid) {
   ASSERT_OK(Put(1, "foo", "bar"));
   ASSERT_OK(Put(1, "foo1", "bar1"));
   // simulate error
-  env_->log_write_error_.store(true, std::memory_order_release);
+  env_->log_write_error_.store(true, std::memory_order_seq_cst);
   ASSERT_NOK(Put(1, "foo2", "bar2"));
-  env_->log_write_error_.store(false, std::memory_order_release);
+  env_->log_write_error_.store(false, std::memory_order_seq_cst);
   // the next put should NOT fail
   ASSERT_OK(Put(1, "foo3", "bar3"));
 }

@@ -52,10 +52,10 @@ class HistogramWindowingImpl : public Histogram {
   void TimerTick();
   void SwapHistoryBucket();
   inline uint64_t current_window() const {
-    return current_window_.load(std::memory_order_relaxed);
+    return current_window_.load(std::memory_order_seq_cst);
   }
   inline uint64_t last_swap_time() const {
-    return last_swap_time_.load(std::memory_order_relaxed);
+    return last_swap_time_.load(std::memory_order_seq_cst);
   }
 
   std::shared_ptr<SystemClock> clock_;

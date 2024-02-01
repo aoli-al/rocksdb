@@ -18,6 +18,6 @@ inline bool should_sample_file_read() {
 
 inline void sample_file_read_inc(FileMetaData* meta) {
   meta->stats.num_reads_sampled.fetch_add(kFileReadSampleRate,
-                                          std::memory_order_relaxed);
+                                          std::memory_order_seq_cst);
 }
 }  // namespace ROCKSDB_NAMESPACE

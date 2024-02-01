@@ -82,7 +82,7 @@ class MockFS : public FileSystemWrapper {
   bool IsPrefetchCalled() { return prefetch_count_ > 0; }
 
   int GetPrefetchCount() {
-    return prefetch_count_.load(std::memory_order_relaxed);
+    return prefetch_count_.load(std::memory_order_seq_cst);
   }
 
  private:

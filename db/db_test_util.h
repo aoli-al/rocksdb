@@ -148,10 +148,10 @@ class SpecialEnv : public EnvWrapper {
         if (env_->table_write_callback_) {
           (*env_->table_write_callback_)();
         }
-        if (env_->drop_writes_.load(std::memory_order_acquire)) {
+        if (env_->drop_writes_.load(std::memory_order_seq_cst)) {
           // Drop writes on the floor
           return Status::OK();
-        } else if (env_->no_space_.load(std::memory_order_acquire)) {
+        } else if (env_->no_space_.load(std::memory_order_seq_cst)) {
           return Status::NoSpace("No space left on device");
         } else {
           env_->bytes_written_ += data.size();
@@ -167,10 +167,10 @@ class SpecialEnv : public EnvWrapper {
         if (env_->table_write_callback_) {
           (*env_->table_write_callback_)();
         }
-        if (env_->drop_writes_.load(std::memory_order_acquire)) {
+        if (env_->drop_writes_.load(std::memory_order_seq_cst)) {
           // Drop writes on the floor
           return Status::OK();
-        } else if (env_->no_space_.load(std::memory_order_acquire)) {
+        } else if (env_->no_space_.load(std::memory_order_seq_cst)) {
           return Status::NoSpace("No space left on device");
         } else {
           env_->bytes_written_ += data.size();
@@ -208,7 +208,7 @@ class SpecialEnv : public EnvWrapper {
       Status Flush() override { return base_->Flush(); }
       Status Sync() override {
         ++env_->sync_counter_;
-        while (env_->delay_sstable_sync_.load(std::memory_order_acquire)) {
+        while (env_->delay_sstable_sync_.load(std::memory_order_seq_cst)) {
           env_->SleepForMicroseconds(100000);
         }
         Status s;
@@ -240,7 +240,7 @@ class SpecialEnv : public EnvWrapper {
       ManifestFile(SpecialEnv* env, std::unique_ptr<WritableFile>&& b)
           : env_(env), base_(std::move(b)) {}
       Status Append(const Slice& data) override {
-        if (env_->manifest_write_error_.load(std::memory_order_acquire)) {
+        if (env_->manifest_write_error_.load(std::memory_order_seq_cst)) {
           return Status::IOError("simulated writer error");
         } else {
           return base_->Append(data);
@@ -257,7 +257,7 @@ class SpecialEnv : public EnvWrapper {
       Status Flush() override { return base_->Flush(); }
       Status Sync() override {
         ++env_->sync_counter_;
-        if (env_->manifest_sync_error_.load(std::memory_order_acquire)) {
+        if (env_->manifest_sync_error_.load(std::memory_order_seq_cst)) {
           return Status::IOError("simulated sync error");
         } else {
           if (env_->skip_fsync_) {
@@ -288,11 +288,11 @@ class SpecialEnv : public EnvWrapper {
         TEST_SYNC_POINT("SpecialEnv::WalFile::Append:1");
 #endif
         Status s;
-        if (env_->log_write_error_.load(std::memory_order_acquire)) {
+        if (env_->log_write_error_.load(std::memory_order_seq_cst)) {
           s = Status::IOError("simulated writer error");
         } else {
           int slowdown =
-              env_->log_write_slowdown_.load(std::memory_order_acquire);
+              env_->log_write_slowdown_.load(std::memory_order_seq_cst);
           if (slowdown > 0) {
             env_->SleepForMicroseconds(slowdown);
           }
@@ -382,12 +382,12 @@ class SpecialEnv : public EnvWrapper {
       std::unique_ptr<WritableFile> base_;
     };
 
-    if (no_file_overwrite_.load(std::memory_order_acquire) &&
+    if (no_file_overwrite_.load(std::memory_order_seq_cst) &&
         target()->FileExists(f).ok()) {
       return Status::NotSupported("SpecialEnv::no_file_overwrite_ is true.");
     }
 
-    if (non_writeable_rate_.load(std::memory_order_acquire) > 0) {
+    if (non_writeable_rate_.load(std::memory_order_seq_cst) > 0) {
       uint32_t random_number;
       {
         MutexLock l(&rnd_mutex_);
@@ -607,7 +607,7 @@ class SpecialEnv : public EnvWrapper {
 
   Status RenameFile(const std::string& src, const std::string& dest) override {
     rename_count_.fetch_add(1);
-    if (rename_error_.load(std::memory_order_acquire)) {
+    if (rename_error_.load(std::memory_order_seq_cst)) {
       return Status::NotSupported("Simulated `RenameFile()` error.");
     }
     return target()->RenameFile(src, dest);

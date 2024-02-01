@@ -720,7 +720,7 @@ Status BlockBasedTable::Open(
       // be an ongoing concern so doesn't deserve a place in Statistics IMHO.
       static std::atomic<uint64_t> unverified_count{0};
       auto prev_count =
-          unverified_count.fetch_add(1, std::memory_order_relaxed);
+          unverified_count.fetch_add(1, std::memory_order_seq_cst);
       if (prev_count == 0) {
         ROCKS_LOG_WARN(
             ioptions.logger,

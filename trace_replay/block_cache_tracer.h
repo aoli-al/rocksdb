@@ -218,7 +218,7 @@ class BlockCacheTracer {
   void EndTrace();
 
   bool is_tracing_enabled() const {
-    return writer_.load(std::memory_order_relaxed);
+    return writer_.load(std::memory_order_seq_cst);
   }
 
   Status WriteBlockAccess(const BlockCacheTraceRecord& record,

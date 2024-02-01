@@ -137,7 +137,7 @@ class SkipList {
   int32_t prev_height_;
 
   inline int GetMaxHeight() const {
-    return max_height_.load(std::memory_order_relaxed);
+    return max_height_.load(std::memory_order_seq_cst);
   }
 
   Node* NewNode(const Key& key, int height);
@@ -178,23 +178,23 @@ struct SkipList<Key, Comparator>::Node {
     assert(n >= 0);
     // Use an 'acquire load' so that we observe a fully initialized
     // version of the returned Node.
-    return (next_[n].load(std::memory_order_acquire));
+    return (next_[n].load(std::memory_order_seq_cst));
   }
   void SetNext(int n, Node* x) {
     assert(n >= 0);
     // Use a 'release store' so that anybody who reads through this
     // pointer observes a fully initialized version of the inserted node.
-    next_[n].store(x, std::memory_order_release);
+    next_[n].store(x, std::memory_order_seq_cst);
   }
 
   // No-barrier variants that can be safely used in a few locations.
   Node* NoBarrier_Next(int n) {
     assert(n >= 0);
-    return next_[n].load(std::memory_order_relaxed);
+    return next_[n].load(std::memory_order_seq_cst);
   }
   void NoBarrier_SetNext(int n, Node* x) {
     assert(n >= 0);
-    next_[n].store(x, std::memory_order_relaxed);
+    next_[n].store(x, std::memory_order_seq_cst);
   }
 
  private:
@@ -449,7 +449,7 @@ void SkipList<Key, Comparator>::Insert(const Key& key) {
     }
   } else {
     // TODO(opt): we could use a NoBarrier predecessor search as an
-    // optimization for architectures where memory_order_acquire needs
+    // optimization for architectures where memory_order_seq_cst needs
     // a synchronization instruction.  Doesn't matter on x86
     FindLessThan(key, prev_);
   }
@@ -471,7 +471,7 @@ void SkipList<Key, Comparator>::Insert(const Key& key) {
     // the loop below.  In the former case the reader will
     // immediately drop to the next level since nullptr sorts after all
     // keys.  In the latter case the reader will use the new node.
-    max_height_.store(height, std::memory_order_relaxed);
+    max_height_.store(height, std::memory_order_seq_cst);
   }
 
   Node* x = NewNode(key, height);

@@ -1683,22 +1683,22 @@ TEST_P(SeqAdvanceConcurrentTest, SeqAdvanceConcurrent) {
     expected_commits = 0;
     std::vector<port::Thread> threads;
 
-    linked.store(0, std::memory_order_release);
+    linked.store(0, std::memory_order_seq_cst);
     std::atomic<bool> batch_formed(false);
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WriteThread::EnterAsBatchGroupLeader:End",
         [&](void* /*arg*/) { batch_formed = true; });
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WriteThread::JoinBatchGroup:Wait", [&](void* /*arg*/) {
-          size_t orig_linked = linked.fetch_add(1, std::memory_order_acq_rel);
+          size_t orig_linked = linked.fetch_add(1, std::memory_order_seq_cst);
           if (orig_linked == 0) {
             // Wait until the others are linked too.
-            while (linked.load(std::memory_order_acquire) < first_group_size) {
+            while (linked.load(std::memory_order_seq_cst) < first_group_size) {
             }
           } else if (orig_linked == first_group_size) {
             // Make the 2nd batch of the rest of writes plus any followup
             // commits from the first batch
-            while (linked.load(std::memory_order_acquire) <
+            while (linked.load(std::memory_order_seq_cst) <
                    txn_cnt + commit_writes) {
             }
           }
@@ -1731,14 +1731,14 @@ TEST_P(SeqAdvanceConcurrentTest, SeqAdvanceConcurrent) {
           FAIL();
       }
       // wait to be linked
-      while (linked.load(std::memory_order_acquire) <= bi) {
+      while (linked.load(std::memory_order_seq_cst) <= bi) {
       }
       // after a queue of size first_group_size
       if (bi + 1 == first_group_size) {
         while (!batch_formed) {
         }
         // to make it more deterministic, wait until the commits are linked
-        while (linked.load(std::memory_order_acquire) <=
+        while (linked.load(std::memory_order_seq_cst) <=
                bi + expected_commits) {
         }
       }

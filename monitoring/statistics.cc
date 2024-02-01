@@ -452,7 +452,7 @@ uint64_t StatisticsImpl::getAndResetTickerCount(uint32_t tickerType) {
     for (size_t core_idx = 0; core_idx < per_core_stats_.Size(); ++core_idx) {
       sum +=
           per_core_stats_.AccessAtCore(core_idx)->tickers_[tickerType].exchange(
-              0, std::memory_order_relaxed);
+              0, std::memory_order_seq_cst);
     }
   }
   if (stats_ && tickerType < TICKER_ENUM_MAX) {
@@ -467,7 +467,7 @@ void StatisticsImpl::recordTick(uint32_t tickerType, uint64_t count) {
   }
   if (tickerType < TICKER_ENUM_MAX) {
     per_core_stats_.Access()->tickers_[tickerType].fetch_add(
-        count, std::memory_order_relaxed);
+        count, std::memory_order_seq_cst);
     if (stats_) {
       stats_->recordTick(tickerType, count);
     }

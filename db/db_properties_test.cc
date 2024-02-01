@@ -76,7 +76,7 @@ TEST_F(DBPropertiesTest, Empty) {
     ASSERT_EQ("1", num);
 
     // Block sync calls
-    env_->delay_sstable_sync_.store(true, std::memory_order_release);
+    env_->delay_sstable_sync_.store(true, std::memory_order_seq_cst);
     ASSERT_OK(Put(1, "k1", std::string(100000, 'x')));  // Fill memtable
     ASSERT_TRUE(dbfull()->GetProperty(
         handles_[1], "rocksdb.num-entries-active-mem-table", &num));
@@ -89,7 +89,7 @@ TEST_F(DBPropertiesTest, Empty) {
 
     ASSERT_EQ("v1", Get(1, "foo"));
     // Release sync calls
-    env_->delay_sstable_sync_.store(false, std::memory_order_release);
+    env_->delay_sstable_sync_.store(false, std::memory_order_seq_cst);
 
     ASSERT_OK(db_->DisableFileDeletions());
     ASSERT_TRUE(

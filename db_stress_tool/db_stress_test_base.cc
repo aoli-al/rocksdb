@@ -2952,7 +2952,7 @@ void StressTest::Open(SharedState* shared, bool reopen) {
         assert(s.ok());
         {
           db_ = optimistic_txn_db_;
-          db_aptr_.store(optimistic_txn_db_, std::memory_order_release);
+          db_aptr_.store(optimistic_txn_db_, std::memory_order_seq_cst);
         }
       } else {
         TransactionDBOptions txn_db_options;
@@ -2985,7 +2985,7 @@ void StressTest::Open(SharedState* shared, bool reopen) {
         // Do not swap the order of the following.
         {
           db_ = txn_db_;
-          db_aptr_.store(txn_db_, std::memory_order_release);
+          db_aptr_.store(txn_db_, std::memory_order_seq_cst);
         }
       }
     }

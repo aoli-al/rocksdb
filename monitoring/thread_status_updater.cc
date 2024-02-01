@@ -52,7 +52,7 @@ void ThreadStatusUpdater::SetEnableTracking(bool enable_tracking) {
   if (data == nullptr) {
     return;
   }
-  data->enable_tracking.store(enable_tracking, std::memory_order_relaxed);
+  data->enable_tracking.store(enable_tracking, std::memory_order_seq_cst);
 }
 
 void ThreadStatusUpdater::SetColumnFamilyInfoKey(const void* cf_key) {
@@ -60,7 +60,7 @@ void ThreadStatusUpdater::SetColumnFamilyInfoKey(const void* cf_key) {
   if (data == nullptr) {
     return;
   }
-  data->cf_key.store(const_cast<void*>(cf_key), std::memory_order_relaxed);
+  data->cf_key.store(const_cast<void*>(cf_key), std::memory_order_seq_cst);
 }
 
 const void* ThreadStatusUpdater::GetColumnFamilyInfoKey() {
@@ -68,7 +68,7 @@ const void* ThreadStatusUpdater::GetColumnFamilyInfoKey() {
   if (data == nullptr) {
     return nullptr;
   }
-  return data->cf_key.load(std::memory_order_relaxed);
+  return data->cf_key.load(std::memory_order_seq_cst);
 }
 
 void ThreadStatusUpdater::SetThreadOperation(
@@ -79,13 +79,13 @@ void ThreadStatusUpdater::SetThreadOperation(
   }
   // NOTE: Our practice here is to set all the thread operation properties
   //       and stage before we set thread operation, and thread operation
-  //       will be set in std::memory_order_release.  This is to ensure
+  //       will be set in std::memory_order_seq_cst.  This is to ensure
   //       whenever a thread operation is not OP_UNKNOWN, we will always
   //       have a consistent information on its properties.
-  data->operation_type.store(type, std::memory_order_release);
+  data->operation_type.store(type, std::memory_order_seq_cst);
   if (type == ThreadStatus::OP_UNKNOWN) {
     data->operation_stage.store(ThreadStatus::STAGE_UNKNOWN,
-                                std::memory_order_relaxed);
+                                std::memory_order_seq_cst);
     ClearThreadOperationProperties();
   }
 }
@@ -95,7 +95,7 @@ ThreadStatus::OperationType ThreadStatusUpdater::GetThreadOperation() {
   if (data == nullptr) {
     return ThreadStatus::OperationType::OP_UNKNOWN;
   }
-  return data->operation_type.load(std::memory_order_relaxed);
+  return data->operation_type.load(std::memory_order_seq_cst);
 }
 
 void ThreadStatusUpdater::SetThreadOperationProperty(int i, uint64_t value) {
@@ -103,7 +103,7 @@ void ThreadStatusUpdater::SetThreadOperationProperty(int i, uint64_t value) {
   if (data == nullptr) {
     return;
   }
-  data->op_properties[i].store(value, std::memory_order_relaxed);
+  data->op_properties[i].store(value, std::memory_order_seq_cst);
 }
 
 void ThreadStatusUpdater::IncreaseThreadOperationProperty(int i,
@@ -112,7 +112,7 @@ void ThreadStatusUpdater::IncreaseThreadOperationProperty(int i,
   if (data == nullptr) {
     return;
   }
-  data->op_properties[i].fetch_add(delta, std::memory_order_relaxed);
+  data->op_properties[i].fetch_add(delta, std::memory_order_seq_cst);
 }
 
 void ThreadStatusUpdater::SetOperationStartTime(const uint64_t start_time) {
@@ -120,7 +120,7 @@ void ThreadStatusUpdater::SetOperationStartTime(const uint64_t start_time) {
   if (data == nullptr) {
     return;
   }
-  data->op_start_time.store(start_time, std::memory_order_relaxed);
+  data->op_start_time.store(start_time, std::memory_order_seq_cst);
 }
 
 void ThreadStatusUpdater::ClearThreadOperation() {
@@ -129,9 +129,9 @@ void ThreadStatusUpdater::ClearThreadOperation() {
     return;
   }
   data->operation_stage.store(ThreadStatus::STAGE_UNKNOWN,
-                              std::memory_order_relaxed);
+                              std::memory_order_seq_cst);
   data->operation_type.store(ThreadStatus::OP_UNKNOWN,
-                             std::memory_order_relaxed);
+                             std::memory_order_seq_cst);
   ClearThreadOperationProperties();
 }
 
@@ -141,7 +141,7 @@ void ThreadStatusUpdater::ClearThreadOperationProperties() {
     return;
   }
   for (int i = 0; i < ThreadStatus::kNumOperationProperties; ++i) {
-    data->op_properties[i].store(0, std::memory_order_relaxed);
+    data->op_properties[i].store(0, std::memory_order_seq_cst);
   }
 }
 
@@ -151,7 +151,7 @@ ThreadStatus::OperationStage ThreadStatusUpdater::SetThreadOperationStage(
   if (data == nullptr) {
     return ThreadStatus::STAGE_UNKNOWN;
   }
-  return data->operation_stage.exchange(stage, std::memory_order_relaxed);
+  return data->operation_stage.exchange(stage, std::memory_order_seq_cst);
 }
 
 void ThreadStatusUpdater::SetThreadState(const ThreadStatus::StateType type) {
@@ -159,7 +159,7 @@ void ThreadStatusUpdater::SetThreadState(const ThreadStatus::StateType type) {
   if (data == nullptr) {
     return;
   }
-  data->state_type.store(type, std::memory_order_relaxed);
+  data->state_type.store(type, std::memory_order_seq_cst);
 }
 
 void ThreadStatusUpdater::ClearThreadState() {
@@ -168,7 +168,7 @@ void ThreadStatusUpdater::ClearThreadState() {
     return;
   }
   data->state_type.store(ThreadStatus::STATE_UNKNOWN,
-                         std::memory_order_relaxed);
+                         std::memory_order_seq_cst);
 }
 
 Status ThreadStatusUpdater::GetThreadList(
@@ -180,12 +180,12 @@ Status ThreadStatusUpdater::GetThreadList(
   std::lock_guard<std::mutex> lck(thread_list_mutex_);
   for (auto* thread_data : thread_data_set_) {
     assert(thread_data);
-    auto thread_id = thread_data->thread_id.load(std::memory_order_relaxed);
-    auto thread_type = thread_data->thread_type.load(std::memory_order_relaxed);
+    auto thread_id = thread_data->thread_id.load(std::memory_order_seq_cst);
+    auto thread_type = thread_data->thread_type.load(std::memory_order_seq_cst);
     // Since any change to cf_info_map requires thread_list_mutex,
     // which is currently held by GetThreadList(), here we can safely
-    // use "memory_order_relaxed" to load the cf_key.
-    auto cf_key = thread_data->cf_key.load(std::memory_order_relaxed);
+    // use "memory_order_seq_cst" to load the cf_key.
+    auto cf_key = thread_data->cf_key.load(std::memory_order_seq_cst);
 
     ThreadStatus::OperationType op_type = ThreadStatus::OP_UNKNOWN;
     ThreadStatus::OperationStage op_stage = ThreadStatus::STAGE_UNKNOWN;
@@ -195,16 +195,16 @@ Status ThreadStatusUpdater::GetThreadList(
 
     auto iter = cf_info_map_.find(cf_key);
     if (iter != cf_info_map_.end()) {
-      op_type = thread_data->operation_type.load(std::memory_order_acquire);
+      op_type = thread_data->operation_type.load(std::memory_order_seq_cst);
       // display lower-level info only when higher-level info is available.
       if (op_type != ThreadStatus::OP_UNKNOWN) {
         op_elapsed_micros = now_micros - thread_data->op_start_time.load(
-                                             std::memory_order_relaxed);
-        op_stage = thread_data->operation_stage.load(std::memory_order_relaxed);
-        state_type = thread_data->state_type.load(std::memory_order_relaxed);
+                                             std::memory_order_seq_cst);
+        op_stage = thread_data->operation_stage.load(std::memory_order_seq_cst);
+        state_type = thread_data->state_type.load(std::memory_order_seq_cst);
         for (int i = 0; i < ThreadStatus::kNumOperationProperties; ++i) {
           op_props[i] =
-              thread_data->op_properties[i].load(std::memory_order_relaxed);
+              thread_data->op_properties[i].load(std::memory_order_seq_cst);
         }
       }
     }
@@ -223,7 +223,7 @@ ThreadStatusData* ThreadStatusUpdater::GetLocalThreadStatus() {
   if (thread_status_data_ == nullptr) {
     return nullptr;
   }
-  if (!thread_status_data_->enable_tracking.load(std::memory_order_relaxed)) {
+  if (!thread_status_data_->enable_tracking.load(std::memory_order_seq_cst)) {
     return nullptr;
   }
   return thread_status_data_;

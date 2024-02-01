@@ -41,16 +41,16 @@ uint8_t WriteThread::BlockingAwaitState(Writer* w, uint8_t goal_mask) {
   // we install below.
   w->CreateMutex();
 
-  auto state = w->state.load(std::memory_order_acquire);
+  auto state = w->state.load(std::memory_order_seq_cst);
   assert(state != STATE_LOCKED_WAITING);
   if ((state & goal_mask) == 0 &&
       w->state.compare_exchange_strong(state, STATE_LOCKED_WAITING)) {
     // we have permission (and an obligation) to use StateMutex
     std::unique_lock<std::mutex> guard(w->StateMutex());
     w->StateCV().wait(guard, [w] {
-      return w->state.load(std::memory_order_relaxed) != STATE_LOCKED_WAITING;
+      return w->state.load(std::memory_order_seq_cst) != STATE_LOCKED_WAITING;
     });
-    state = w->state.load(std::memory_order_relaxed);
+    state = w->state.load(std::memory_order_seq_cst);
   }
   // else tricky.  Goal is met or CAS failed.  In the latter case the waker
   // must have changed the state, and compare_exchange_strong has updated
@@ -74,7 +74,7 @@ uint8_t WriteThread::AwaitState(Writer* w, uint8_t goal_mask,
   // more than a microsecond.  This is long enough that waits longer than
   // this can amortize the cost of accessing the clock and yielding.
   for (uint32_t tries = 0; tries < 200; ++tries) {
-    state = w->state.load(std::memory_order_acquire);
+    state = w->state.load(std::memory_order_seq_cst);
     if ((state & goal_mask) != 0) {
       return state;
     }
@@ -144,7 +144,7 @@ uint8_t WriteThread::AwaitState(Writer* w, uint8_t goal_mask,
   if (max_yield_usec_ > 0) {
     update_ctx = Random::GetTLSInstance()->OneIn(sampling_base);
 
-    if (update_ctx || yield_credit.load(std::memory_order_relaxed) >= 0) {
+    if (update_ctx || yield_credit.load(std::memory_order_seq_cst) >= 0) {
       // we're updating the adaptation statistics, or spinning has >
       // 50% chance of being shorter than max_yield_usec_ and causing no
       // involuntary context switches
@@ -159,7 +159,7 @@ uint8_t WriteThread::AwaitState(Writer* w, uint8_t goal_mask,
              std::chrono::microseconds(max_yield_usec_)) {
         std::this_thread::yield();
 
-        state = w->state.load(std::memory_order_acquire);
+        state = w->state.load(std::memory_order_seq_cst);
         if ((state & goal_mask) != 0) {
           // success
           would_spin_again = true;
@@ -192,7 +192,7 @@ uint8_t WriteThread::AwaitState(Writer* w, uint8_t goal_mask,
   if (update_ctx) {
     // Since our update is sample based, it is ok if a thread overwrites the
     // updates by other threads. Thus the update does not have to be atomic.
-    auto v = yield_credit.load(std::memory_order_relaxed);
+    auto v = yield_credit.load(std::memory_order_seq_cst);
     // fixed point exponential decay with decay constant 1/1024, with +1
     // and -1 scaled to avoid overflow for int32_t
     //
@@ -202,7 +202,7 @@ uint8_t WriteThread::AwaitState(Writer* w, uint8_t goal_mask,
     // 2^17*2^10=2^27, which is lower than 2^31 the upperbound of int32_t. Same
     // logic applies to negative credits.
     v = v - (v / 1024) + (would_spin_again ? 1 : -1) * 131072;
-    yield_credit.store(v, std::memory_order_relaxed);
+    yield_credit.store(v, std::memory_order_seq_cst);
   }
 
   assert((state & goal_mask) != 0);
@@ -211,14 +211,14 @@ uint8_t WriteThread::AwaitState(Writer* w, uint8_t goal_mask,
 
 void WriteThread::SetState(Writer* w, uint8_t new_state) {
   assert(w);
-  auto state = w->state.load(std::memory_order_acquire);
+  auto state = w->state.load(std::memory_order_seq_cst);
   if (state == STATE_LOCKED_WAITING ||
       !w->state.compare_exchange_strong(state, new_state)) {
     assert(state == STATE_LOCKED_WAITING);
 
     std::lock_guard<std::mutex> guard(w->StateMutex());
-    assert(w->state.load(std::memory_order_relaxed) != new_state);
-    w->state.store(new_state, std::memory_order_relaxed);
+    assert(w->state.load(std::memory_order_seq_cst) != new_state);
+    w->state.store(new_state, std::memory_order_seq_cst);
     w->StateCV().notify_one();
   }
 }
@@ -226,7 +226,7 @@ void WriteThread::SetState(Writer* w, uint8_t new_state) {
 bool WriteThread::LinkOne(Writer* w, std::atomic<Writer*>* newest_writer) {
   assert(newest_writer != nullptr);
   assert(w->state == STATE_INIT);
-  Writer* writers = newest_writer->load(std::memory_order_relaxed);
+  Writer* writers = newest_writer->load(std::memory_order_seq_cst);
   while (true) {
     assert(writers != w);
     // If write stall in effect, and w->no_slowdown is not true,
@@ -242,12 +242,12 @@ bool WriteThread::LinkOne(Writer* w, std::atomic<Writer*>* newest_writer) {
       // stall clearing
       {
         MutexLock lock(&stall_mu_);
-        writers = newest_writer->load(std::memory_order_relaxed);
+        writers = newest_writer->load(std::memory_order_seq_cst);
         if (writers == &write_stall_dummy_) {
           TEST_SYNC_POINT_CALLBACK("WriteThread::WriteStall::Wait", w);
           stall_cv_.Wait();
           // Load newest_writers_ again since it may have changed
-          writers = newest_writer->load(std::memory_order_relaxed);
+          writers = newest_writer->load(std::memory_order_seq_cst);
           continue;
         }
       }
@@ -275,7 +275,7 @@ bool WriteThread::LinkGroup(WriteGroup& write_group,
     }
     w = w->link_older;
   }
-  Writer* newest = newest_writer->load(std::memory_order_relaxed);
+  Writer* newest = newest_writer->load(std::memory_order_seq_cst);
   while (true) {
     leader->link_older = newest;
     if (newest_writer->compare_exchange_weak(newest, last_writer)) {
@@ -361,7 +361,7 @@ void WriteThread::EndWriteStall() {
 
   // Unlink write_stall_dummy_ from the write queue. This will unblock
   // pending write threads to enqueue themselves
-  assert(newest_writer_.load(std::memory_order_relaxed) == &write_stall_dummy_);
+  assert(newest_writer_.load(std::memory_order_seq_cst) == &write_stall_dummy_);
   // write_stall_dummy_.link_older can be nullptr only if LockWAL() has been
   // called.
   if (write_stall_dummy_.link_older) {
@@ -378,12 +378,12 @@ void WriteThread::EndWriteStall() {
 uint64_t WriteThread::GetBegunCountOfOutstandingStall() {
   if (stall_begun_count_ > stall_ended_count_) {
     // Oustanding stall in queue
-    assert(newest_writer_.load(std::memory_order_relaxed) ==
+    assert(newest_writer_.load(std::memory_order_seq_cst) ==
            &write_stall_dummy_);
     return stall_begun_count_;
   } else {
     // No stall in queue
-    assert(newest_writer_.load(std::memory_order_relaxed) !=
+    assert(newest_writer_.load(std::memory_order_seq_cst) !=
            &write_stall_dummy_);
     return 0;
   }
@@ -455,7 +455,7 @@ size_t WriteThread::EnterAsBatchGroupLeader(Writer* leader,
   write_group->leader = leader;
   write_group->last_writer = leader;
   write_group->size = 1;
-  Writer* newest_writer = newest_writer_.load(std::memory_order_acquire);
+  Writer* newest_writer = newest_writer_.load(std::memory_order_seq_cst);
 
   // This is safe regardless of any db mutex status of the caller. Previous
   // calls to ExitAsGroupLeader either didn't call CreateMissingNewerLinks
@@ -690,7 +690,7 @@ void WriteThread::ExitAsBatchGroupLeader(WriteGroup& write_group,
     // a race where the owning thread of one of these writers can start a new
     // write operation.
     Writer dummy;
-    Writer* head = newest_writer_.load(std::memory_order_acquire);
+    Writer* head = newest_writer_.load(std::memory_order_seq_cst);
     if (head != last_writer ||
         !newest_writer_.compare_exchange_strong(head, &dummy)) {
       // Either last_writer wasn't the head during the load(), or it was the
@@ -738,7 +738,7 @@ void WriteThread::ExitAsBatchGroupLeader(WriteGroup& write_group,
     }
 
     // Unlink the dummy writer from the list and identify the new leader
-    head = newest_writer_.load(std::memory_order_acquire);
+    head = newest_writer_.load(std::memory_order_seq_cst);
     if (head != &dummy ||
         !newest_writer_.compare_exchange_strong(head, nullptr)) {
       CreateMissingNewerLinks(head);
@@ -753,7 +753,7 @@ void WriteThread::ExitAsBatchGroupLeader(WriteGroup& write_group,
                    STATE_COMPLETED,
                &eabgl_ctx);
   } else {
-    Writer* head = newest_writer_.load(std::memory_order_acquire);
+    Writer* head = newest_writer_.load(std::memory_order_seq_cst);
     if (head != last_writer ||
         !newest_writer_.compare_exchange_strong(head, nullptr)) {
       // Either last_writer wasn't the head during the load(), or it was the

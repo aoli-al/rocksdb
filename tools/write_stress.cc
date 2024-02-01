@@ -167,11 +167,11 @@ class WriteStress {
       return ret;
     };
 
-    while (!stop_.load(std::memory_order_relaxed)) {
+    while (!stop_.load(std::memory_order_seq_cst)) {
       std::string prefix;
       prefix.resize(kPrefixSize);
       for (int i = 0; i < kPrefixSize; ++i) {
-        prefix[i] = key_prefix_[i].load(std::memory_order_relaxed);
+        prefix[i] = key_prefix_[i].load(std::memory_order_seq_cst);
       }
       auto key = prefix + random_string(rng, FLAGS_key_size - kPrefixSize);
       auto value = random_string(rng, FLAGS_value_size);
@@ -186,7 +186,7 @@ class WriteStress {
   }
 
   void IteratorHoldThread() {
-    while (!stop_.load(std::memory_order_relaxed)) {
+    while (!stop_.load(std::memory_order_seq_cst)) {
       std::unique_ptr<Iterator> iterator(db_->NewIterator(ReadOptions()));
       SystemClock::Default()->SleepForMicroseconds(FLAGS_iterator_hold_sec *
                                                    1000 * 1000LL);
@@ -204,20 +204,20 @@ class WriteStress {
     std::mt19937 rng(static_cast<unsigned int>(FLAGS_seed));
     std::uniform_real_distribution<double> dist(0, 1);
     std::uniform_int_distribution<int> char_dist('a', 'z');
-    while (!stop_.load(std::memory_order_relaxed)) {
+    while (!stop_.load(std::memory_order_seq_cst)) {
       SystemClock::Default()->SleepForMicroseconds(
           static_cast<int>(FLAGS_prefix_mutate_period_sec * 1000 * 1000LL));
       if (dist(rng) < FLAGS_first_char_mutate_probability) {
         key_prefix_[0].store(static_cast<char>(char_dist(rng)),
-                             std::memory_order_relaxed);
+                             std::memory_order_seq_cst);
       }
       if (dist(rng) < FLAGS_second_char_mutate_probability) {
         key_prefix_[1].store(static_cast<char>(char_dist(rng)),
-                             std::memory_order_relaxed);
+                             std::memory_order_seq_cst);
       }
       if (dist(rng) < FLAGS_third_char_mutate_probability) {
         key_prefix_[2].store(static_cast<char>(char_dist(rng)),
-                             std::memory_order_relaxed);
+                             std::memory_order_seq_cst);
       }
     }
   }
@@ -237,7 +237,7 @@ class WriteStress {
     SystemClock::Default()->SleepForMicroseconds(FLAGS_runtime_sec * 1000 *
                                                  1000);
 
-    stop_.store(true, std::memory_order_relaxed);
+    stop_.store(true, std::memory_order_seq_cst);
     for (auto& t : threads_) {
       t.join();
     }

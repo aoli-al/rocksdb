@@ -1428,7 +1428,7 @@ FilterBitsBuilder* BloomLikeFilterPolicy::GetFastLocalBloomBuilderWithContext(
 FilterBitsBuilder* BloomLikeFilterPolicy::GetLegacyBloomBuilderWithContext(
     const FilterBuildingContext& context) const {
   if (whole_bits_per_key_ >= 14 && context.info_log &&
-      !warned_.load(std::memory_order_relaxed)) {
+      !warned_.load(std::memory_order_seq_cst)) {
     warned_ = true;
     const char* adjective;
     if (whole_bits_per_key_ >= 20) {
@@ -1748,7 +1748,7 @@ FilterBitsBuilder* RibbonFilterPolicy::GetBuilderWithContext(
   // INT_MAX is reserved for "always use Bloom".
   int levelish = INT_MAX - 1;
 
-  int bloom_before_level = bloom_before_level_.load(std::memory_order_relaxed);
+  int bloom_before_level = bloom_before_level_.load(std::memory_order_seq_cst);
   if (bloom_before_level < INT_MAX) {
     switch (context.compaction_style) {
       case kCompactionStyleLevel:
@@ -1788,7 +1788,7 @@ const char* RibbonFilterPolicy::kName() { return "RibbonFilterPolicy"; }
 
 std::string RibbonFilterPolicy::GetId() const {
   return BloomLikeFilterPolicy::GetId() + ":" +
-         std::to_string(bloom_before_level_.load(std::memory_order_acquire));
+         std::to_string(bloom_before_level_.load(std::memory_order_seq_cst));
 }
 
 FilterPolicy* NewRibbonFilterPolicy(double bloom_equivalent_bits_per_key,

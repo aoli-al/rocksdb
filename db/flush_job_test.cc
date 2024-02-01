@@ -718,7 +718,7 @@ TEST_P(FlushJobTimestampTest, AllKeysExpired) {
       // timestamp.
       key.append(test::EncodeInt(0));
     } else {
-      key.append(test::EncodeInt(curr_ts_.load(std::memory_order_relaxed) - 1));
+      key.append(test::EncodeInt(curr_ts_.load(std::memory_order_seq_cst) - 1));
     }
     InternalKey ikey(key, curr_seq_ - 1, ValueType::kTypeDeletionWithTimestamp);
     CheckFileMetaData(cfd, ikey, ikey, &fmeta);
@@ -790,7 +790,7 @@ TEST_P(FlushJobTimestampTest, NoKeyExpired) {
       PutFixed64(&expected_full_history_ts_low, curr_ts_.fetch_add(1));
     } else {
       smallest_key =
-          ukey + test::EncodeInt(curr_ts_.load(std::memory_order_relaxed) - 1);
+          ukey + test::EncodeInt(curr_ts_.load(std::memory_order_seq_cst) - 1);
       largest_key = ukey + test::EncodeInt(kStartTs);
       expected_full_history_ts_low = full_history_ts_low;
     }

@@ -74,16 +74,16 @@ class ConcurrentArena : public Allocator {
   }
 
   size_t MemoryAllocatedBytes() const {
-    return memory_allocated_bytes_.load(std::memory_order_relaxed);
+    return memory_allocated_bytes_.load(std::memory_order_seq_cst);
   }
 
   size_t AllocatedAndUnused() const {
-    return arena_allocated_and_unused_.load(std::memory_order_relaxed) +
+    return arena_allocated_and_unused_.load(std::memory_order_seq_cst) +
            ShardAllocatedAndUnused();
   }
 
   size_t IrregularBlockNum() const {
-    return irregular_block_num_.load(std::memory_order_relaxed);
+    return irregular_block_num_.load(std::memory_order_seq_cst);
   }
 
   size_t BlockSize() const override { return arena_.BlockSize(); }
@@ -120,7 +120,7 @@ class ConcurrentArena : public Allocator {
     size_t total = 0;
     for (size_t i = 0; i < shards_.Size(); ++i) {
       total += shards_.AccessAtCore(i)->allocated_and_unused_.load(
-          std::memory_order_relaxed);
+          std::memory_order_seq_cst);
     }
     return total;
   }
@@ -137,7 +137,7 @@ class ConcurrentArena : public Allocator {
     if (bytes > shard_block_size_ / 4 || force_arena ||
         ((cpu = tls_cpuid) == 0 &&
          !shards_.AccessAtCore(0)->allocated_and_unused_.load(
-             std::memory_order_relaxed) &&
+             std::memory_order_seq_cst) &&
          arena_lock.try_lock())) {
       if (!arena_lock.owns_lock()) {
         arena_lock.lock();
@@ -155,14 +155,14 @@ class ConcurrentArena : public Allocator {
     }
     std::unique_lock<SpinMutex> lock(s->mutex, std::adopt_lock);
 
-    size_t avail = s->allocated_and_unused_.load(std::memory_order_relaxed);
+    size_t avail = s->allocated_and_unused_.load(std::memory_order_seq_cst);
     if (avail < bytes) {
       // reload
       std::lock_guard<SpinMutex> reload_lock(arena_mutex_);
 
       // If the arena's current block is within a factor of 2 of the right
       // size, we adjust our request to avoid arena waste.
-      auto exact = arena_allocated_and_unused_.load(std::memory_order_relaxed);
+      auto exact = arena_allocated_and_unused_.load(std::memory_order_seq_cst);
       assert(exact == arena_.AllocatedAndUnused());
 
       if (exact >= bytes && arena_.IsInInlineBlock()) {
@@ -185,7 +185,7 @@ class ConcurrentArena : public Allocator {
       s->free_begin_ = arena_.AllocateAligned(avail);
       Fixup();
     }
-    s->allocated_and_unused_.store(avail - bytes, std::memory_order_relaxed);
+    s->allocated_and_unused_.store(avail - bytes, std::memory_order_seq_cst);
 
     char* rv;
     if ((bytes % sizeof(void*)) == 0) {
@@ -201,11 +201,11 @@ class ConcurrentArena : public Allocator {
 
   void Fixup() {
     arena_allocated_and_unused_.store(arena_.AllocatedAndUnused(),
-                                      std::memory_order_relaxed);
+                                      std::memory_order_seq_cst);
     memory_allocated_bytes_.store(arena_.MemoryAllocatedBytes(),
-                                  std::memory_order_relaxed);
+                                  std::memory_order_seq_cst);
     irregular_block_num_.store(arena_.IrregularBlockNum(),
-                               std::memory_order_relaxed);
+                               std::memory_order_seq_cst);
   }
 
   ConcurrentArena(const ConcurrentArena&) = delete;

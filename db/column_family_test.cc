@@ -2181,7 +2181,7 @@ struct CountOptionsFilesFs : public FileSystemWrapper {
                            std::unique_ptr<FSWritableFile>* r,
                            IODebugContext* dbg) override {
     if (f.find("OPTIONS-") != std::string::npos) {
-      options_files_created.fetch_add(1, std::memory_order_relaxed);
+      options_files_created.fetch_add(1, std::memory_order_seq_cst);
     }
     return FileSystemWrapper::NewWritableFile(f, file_opts, r, dbg);
   }

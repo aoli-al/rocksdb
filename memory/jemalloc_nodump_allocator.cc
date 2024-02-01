@@ -241,7 +241,7 @@ void* JemallocNodumpAllocator::Alloc(extent_hooks_t* extent, void* new_addr,
                                      size_t size, size_t alignment, bool* zero,
                                      bool* commit, unsigned arena_ind) {
   extent_alloc_t* original_alloc =
-      original_alloc_.load(std::memory_order_relaxed);
+      original_alloc_.load(std::memory_order_seq_cst);
   assert(original_alloc != nullptr);
   void* result = original_alloc(extent, new_addr, size, alignment, zero, commit,
                                 arena_ind);

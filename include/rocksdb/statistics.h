@@ -785,10 +785,10 @@ class Statistics : public Customizable {
     return type < HISTOGRAM_ENUM_MAX;
   }
   void set_stats_level(StatsLevel sl) {
-    stats_level_.store(sl, std::memory_order_relaxed);
+    stats_level_.store(sl, std::memory_order_seq_cst);
   }
   StatsLevel get_stats_level() const {
-    return stats_level_.load(std::memory_order_relaxed);
+    return stats_level_.load(std::memory_order_seq_cst);
   }
 
  private:

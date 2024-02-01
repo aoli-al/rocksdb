@@ -106,11 +106,11 @@ class SpinMutex {
   SpinMutex() : locked_(false) {}
 
   bool try_lock() {
-    auto currently_locked = locked_.load(std::memory_order_relaxed);
+    auto currently_locked = locked_.load(std::memory_order_seq_cst);
     return !currently_locked &&
            locked_.compare_exchange_weak(currently_locked, true,
-                                         std::memory_order_acquire,
-                                         std::memory_order_relaxed);
+                                         std::memory_order_seq_cst,
+                                         std::memory_order_seq_cst);
   }
 
   void lock() {
@@ -126,7 +126,7 @@ class SpinMutex {
     }
   }
 
-  void unlock() { locked_.store(false, std::memory_order_release); }
+  void unlock() { locked_.store(false, std::memory_order_seq_cst); }
 
  private:
   std::atomic<bool> locked_;

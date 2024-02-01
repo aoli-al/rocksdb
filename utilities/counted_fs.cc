@@ -257,29 +257,29 @@ class CountedDirectory : public FSDirectoryWrapper {
 
 std::string FileOpCounters::PrintCounters() const {
   std::stringstream ss;
-  ss << "Num files opened: " << opens.load(std::memory_order_relaxed)
+  ss << "Num files opened: " << opens.load(std::memory_order_seq_cst)
      << std::endl;
-  ss << "Num files deleted: " << deletes.load(std::memory_order_relaxed)
+  ss << "Num files deleted: " << deletes.load(std::memory_order_seq_cst)
      << std::endl;
-  ss << "Num files renamed: " << renames.load(std::memory_order_relaxed)
+  ss << "Num files renamed: " << renames.load(std::memory_order_seq_cst)
      << std::endl;
-  ss << "Num Flush(): " << flushes.load(std::memory_order_relaxed) << std::endl;
-  ss << "Num Sync(): " << syncs.load(std::memory_order_relaxed) << std::endl;
-  ss << "Num Fsync(): " << fsyncs.load(std::memory_order_relaxed) << std::endl;
-  ss << "Num Dir Fsync(): " << dsyncs.load(std::memory_order_relaxed)
+  ss << "Num Flush(): " << flushes.load(std::memory_order_seq_cst) << std::endl;
+  ss << "Num Sync(): " << syncs.load(std::memory_order_seq_cst) << std::endl;
+  ss << "Num Fsync(): " << fsyncs.load(std::memory_order_seq_cst) << std::endl;
+  ss << "Num Dir Fsync(): " << dsyncs.load(std::memory_order_seq_cst)
      << std::endl;
-  ss << "Num Close(): " << closes.load(std::memory_order_relaxed) << std::endl;
-  ss << "Num Dir Open(): " << dir_opens.load(std::memory_order_relaxed)
+  ss << "Num Close(): " << closes.load(std::memory_order_seq_cst) << std::endl;
+  ss << "Num Dir Open(): " << dir_opens.load(std::memory_order_seq_cst)
      << std::endl;
-  ss << "Num Dir Close(): " << dir_closes.load(std::memory_order_relaxed)
+  ss << "Num Dir Close(): " << dir_closes.load(std::memory_order_seq_cst)
      << std::endl;
-  ss << "Num Read(): " << reads.ops.load(std::memory_order_relaxed)
+  ss << "Num Read(): " << reads.ops.load(std::memory_order_seq_cst)
      << std::endl;
-  ss << "Num Append(): " << writes.ops.load(std::memory_order_relaxed)
+  ss << "Num Append(): " << writes.ops.load(std::memory_order_seq_cst)
      << std::endl;
-  ss << "Num bytes read: " << reads.bytes.load(std::memory_order_relaxed)
+  ss << "Num bytes read: " << reads.bytes.load(std::memory_order_seq_cst)
      << std::endl;
-  ss << "Num bytes written: " << writes.bytes.load(std::memory_order_relaxed)
+  ss << "Num bytes written: " << writes.bytes.load(std::memory_order_seq_cst)
      << std::endl;
   return ss.str();
 }

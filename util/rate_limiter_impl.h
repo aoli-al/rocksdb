@@ -47,7 +47,7 @@ class GenericRateLimiter : public RateLimiter {
                Statistics* stats) override;
 
   int64_t GetSingleBurstBytes() const override {
-    return refill_bytes_per_period_.load(std::memory_order_relaxed);
+    return refill_bytes_per_period_.load(std::memory_order_seq_cst);
   }
 
   int64_t GetTotalBytesThrough(
@@ -94,7 +94,7 @@ class GenericRateLimiter : public RateLimiter {
   }
 
   int64_t GetBytesPerSecond() const override {
-    return rate_bytes_per_sec_.load(std::memory_order_relaxed);
+    return rate_bytes_per_sec_.load(std::memory_order_seq_cst);
   }
 
   virtual void TEST_SetClock(std::shared_ptr<SystemClock> clock) {

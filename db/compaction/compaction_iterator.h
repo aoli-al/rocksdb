@@ -510,13 +510,13 @@ class CompactionIterator {
   void SkipUntil(const Slice& skip_until) { input_.Seek(skip_until); }
 
   bool IsShuttingDown() {
-    // This is a best-effort facility, so memory_order_relaxed is sufficient.
-    return shutting_down_ && shutting_down_->load(std::memory_order_relaxed);
+    // This is a best-effort facility, so memory_order_seq_cst is sufficient.
+    return shutting_down_ && shutting_down_->load(std::memory_order_seq_cst);
   }
 
   bool IsPausingManualCompaction() {
-    // This is a best-effort facility, so memory_order_relaxed is sufficient.
-    return manual_compaction_canceled_.load(std::memory_order_relaxed);
+    // This is a best-effort facility, so memory_order_seq_cst is sufficient.
+    return manual_compaction_canceled_.load(std::memory_order_seq_cst);
   }
 
   // Stores whether the current compaction iterator output

@@ -1685,7 +1685,7 @@ void InternalStats::DumpDBMapStatsWriteStall(
           WriteStallStatsMapKeys::CauseConditionCount(cause, condition);
       uint64_t stat =
           db_stats_[static_cast<std::size_t>(internal_db_stat)].load(
-              std::memory_order_relaxed);
+              std::memory_order_seq_cst);
       (*value)[name] = std::to_string(stat);
     }
   }

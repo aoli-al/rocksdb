@@ -264,7 +264,7 @@ class WritableFileWriter {
   IOStatus SyncWithoutFlush(const IOOptions& opts, bool use_fsync);
 
   uint64_t GetFileSize() const {
-    return filesize_.load(std::memory_order_acquire);
+    return filesize_.load(std::memory_order_seq_cst);
   }
 
   // Returns the size of data flushed to the underlying `FSWritableFile`.
@@ -272,7 +272,7 @@ class WritableFileWriter {
   // The return value can serve as a lower-bound for the amount of data synced
   // by a future call to `SyncWithoutFlush()`.
   uint64_t GetFlushedSize() const {
-    return flushed_size_.load(std::memory_order_acquire);
+    return flushed_size_.load(std::memory_order_seq_cst);
   }
 
   IOStatus InvalidateCache(size_t offset, size_t length) {
@@ -295,14 +295,14 @@ class WritableFileWriter {
   const char* GetFileChecksumFuncName() const;
 
   bool seen_error() const {
-    return seen_error_.load(std::memory_order_relaxed);
+    return seen_error_.load(std::memory_order_seq_cst);
   }
   // For options of relaxed consistency, users might hope to continue
   // operating on the file after an error happens.
   void reset_seen_error() {
-    seen_error_.store(false, std::memory_order_relaxed);
+    seen_error_.store(false, std::memory_order_seq_cst);
   }
-  void set_seen_error() { seen_error_.store(true, std::memory_order_relaxed); }
+  void set_seen_error() { seen_error_.store(true, std::memory_order_seq_cst); }
 
   IOStatus AssertFalseAndGetStatusForPrevError() {
     // This should only happen if SyncWithoutFlush() was called.

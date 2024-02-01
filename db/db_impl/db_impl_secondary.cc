@@ -840,7 +840,7 @@ Status DB::OpenAsSecondary(
 Status DBImplSecondary::CompactWithoutInstallation(
     const OpenAndCompactOptions& options, ColumnFamilyHandle* cfh,
     const CompactionServiceInput& input, CompactionServiceResult* result) {
-  if (options.canceled && options.canceled->load(std::memory_order_acquire)) {
+  if (options.canceled && options.canceled->load(std::memory_order_seq_cst)) {
     return Status::Incomplete(Status::SubCode::kManualCompactionPaused);
   }
   InstrumentedMutexLock l(&mutex_);
@@ -934,7 +934,7 @@ Status DB::OpenAndCompact(
     const std::string& output_directory, const std::string& input,
     std::string* output,
     const CompactionServiceOptionsOverride& override_options) {
-  if (options.canceled && options.canceled->load(std::memory_order_acquire)) {
+  if (options.canceled && options.canceled->load(std::memory_order_seq_cst)) {
     return Status::Incomplete(Status::SubCode::kManualCompactionPaused);
   }
   CompactionServiceInput compaction_input;

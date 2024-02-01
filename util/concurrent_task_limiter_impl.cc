@@ -26,21 +26,21 @@ ConcurrentTaskLimiterImpl::~ConcurrentTaskLimiterImpl() {
 const std::string& ConcurrentTaskLimiterImpl::GetName() const { return name_; }
 
 void ConcurrentTaskLimiterImpl::SetMaxOutstandingTask(int32_t limit) {
-  max_outstanding_tasks_.store(limit, std::memory_order_relaxed);
+  max_outstanding_tasks_.store(limit, std::memory_order_seq_cst);
 }
 
 void ConcurrentTaskLimiterImpl::ResetMaxOutstandingTask() {
-  max_outstanding_tasks_.store(-1, std::memory_order_relaxed);
+  max_outstanding_tasks_.store(-1, std::memory_order_seq_cst);
 }
 
 int32_t ConcurrentTaskLimiterImpl::GetOutstandingTask() const {
-  return outstanding_tasks_.load(std::memory_order_relaxed);
+  return outstanding_tasks_.load(std::memory_order_seq_cst);
 }
 
 std::unique_ptr<TaskLimiterToken> ConcurrentTaskLimiterImpl::GetToken(
     bool force) {
-  int32_t limit = max_outstanding_tasks_.load(std::memory_order_relaxed);
-  int32_t tasks = outstanding_tasks_.load(std::memory_order_relaxed);
+  int32_t limit = max_outstanding_tasks_.load(std::memory_order_seq_cst);
+  int32_t tasks = outstanding_tasks_.load(std::memory_order_seq_cst);
   // force = true, bypass the throttle.
   // limit < 0 means unlimited tasks.
   while (force || limit < 0 || tasks < limit) {

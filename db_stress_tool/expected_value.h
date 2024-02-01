@@ -212,7 +212,7 @@ class PendingExpectedValue {
     ClosePendingState();
     // To prevent low-level instruction reordering that results
     // in setting expected value happens before db write
-    std::atomic_thread_fence(std::memory_order_release);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
     value_ptr_->store(final_value_.Read());
   }
 
@@ -225,7 +225,7 @@ class PendingExpectedValue {
     ClosePendingState();
     // To prevent low-level instruction reordering that results
     // in setting expected value happens before db write
-    std::atomic_thread_fence(std::memory_order_release);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
     value_ptr_->store(orig_value_.Read());
   }
 

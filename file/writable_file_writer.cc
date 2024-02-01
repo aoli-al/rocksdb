@@ -188,8 +188,8 @@ IOStatus WritableFileWriter::Append(const IOOptions& opts, const Slice& data,
 
   TEST_KILL_RANDOM("WritableFileWriter::Append:1");
   if (s.ok()) {
-    uint64_t cur_size = filesize_.load(std::memory_order_acquire);
-    filesize_.store(cur_size + data.size(), std::memory_order_release);
+    uint64_t cur_size = filesize_.load(std::memory_order_seq_cst);
+    filesize_.store(cur_size + data.size(), std::memory_order_seq_cst);
   } else {
     set_seen_error();
   }
@@ -224,8 +224,8 @@ IOStatus WritableFileWriter::Pad(const IOOptions& opts,
     cap = buf_.Capacity() - buf_.CurrentSize();
   }
   pending_sync_ = true;
-  uint64_t cur_size = filesize_.load(std::memory_order_acquire);
-  filesize_.store(cur_size + pad_bytes, std::memory_order_release);
+  uint64_t cur_size = filesize_.load(std::memory_order_seq_cst);
+  filesize_.store(cur_size + pad_bytes, std::memory_order_seq_cst);
   if (perform_data_verification_) {
     buffered_data_crc32c_checksum_ =
         crc32c::Extend(buffered_data_crc32c_checksum_,
@@ -272,7 +272,7 @@ IOStatus WritableFileWriter::Close(const IOOptions& opts) {
       if (ShouldNotifyListeners()) {
         start_ts = FileOperationInfo::StartNow();
       }
-      uint64_t filesz = filesize_.load(std::memory_order_acquire);
+      uint64_t filesz = filesize_.load(std::memory_order_seq_cst);
       interim = writable_file_->Truncate(filesz, io_options, nullptr);
       if (ShouldNotifyListeners()) {
         auto finish_ts = FileOperationInfo::FinishNow();
@@ -409,7 +409,7 @@ IOStatus WritableFileWriter::Flush(const IOOptions& opts) {
     const uint64_t kBytesNotSyncRange =
         1024 * 1024;                                // recent 1MB is not synced.
     const uint64_t kBytesAlignWhenSync = 4 * 1024;  // Align 4KB.
-    uint64_t cur_size = filesize_.load(std::memory_order_acquire);
+    uint64_t cur_size = filesize_.load(std::memory_order_seq_cst);
     if (cur_size > kBytesNotSyncRange) {
       uint64_t offset_sync_to = cur_size - kBytesNotSyncRange;
       offset_sync_to -= offset_sync_to % kBytesAlignWhenSync;
@@ -643,8 +643,8 @@ IOStatus WritableFileWriter::WriteBuffered(const IOOptions& opts,
 
     left -= allowed;
     src += allowed;
-    uint64_t cur_size = flushed_size_.load(std::memory_order_acquire);
-    flushed_size_.store(cur_size + allowed, std::memory_order_release);
+    uint64_t cur_size = flushed_size_.load(std::memory_order_seq_cst);
+    flushed_size_.store(cur_size + allowed, std::memory_order_seq_cst);
   }
   buf_.Size(0);
   buffered_data_crc32c_checksum_ = 0;
@@ -736,8 +736,8 @@ IOStatus WritableFileWriter::WriteBufferedWithChecksum(const IOOptions& opts,
   // the corresponding checksum value
   buf_.Size(0);
   buffered_data_crc32c_checksum_ = 0;
-  uint64_t cur_size = flushed_size_.load(std::memory_order_acquire);
-  flushed_size_.store(cur_size + left, std::memory_order_release);
+  uint64_t cur_size = flushed_size_.load(std::memory_order_seq_cst);
+  flushed_size_.store(cur_size + left, std::memory_order_seq_cst);
   if (!s.ok()) {
     set_seen_error();
   }
@@ -849,8 +849,8 @@ IOStatus WritableFileWriter::WriteDirect(const IOOptions& opts) {
     left -= size;
     src += size;
     write_offset += size;
-    uint64_t cur_size = flushed_size_.load(std::memory_order_acquire);
-    flushed_size_.store(cur_size + size, std::memory_order_release);
+    uint64_t cur_size = flushed_size_.load(std::memory_order_seq_cst);
+    flushed_size_.store(cur_size + size, std::memory_order_seq_cst);
     assert((next_write_offset_ % alignment) == 0);
   }
 
@@ -955,8 +955,8 @@ IOStatus WritableFileWriter::WriteDirectWithChecksum(const IOOptions& opts) {
 
   IOSTATS_ADD(bytes_written, left);
   assert((next_write_offset_ % alignment) == 0);
-  uint64_t cur_size = flushed_size_.load(std::memory_order_acquire);
-  flushed_size_.store(cur_size + left, std::memory_order_release);
+  uint64_t cur_size = flushed_size_.load(std::memory_order_seq_cst);
+  flushed_size_.store(cur_size + left, std::memory_order_seq_cst);
 
   if (s.ok()) {
     // Move the tail to the beginning of the buffer

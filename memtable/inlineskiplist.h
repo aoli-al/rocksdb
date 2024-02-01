@@ -216,7 +216,7 @@ class InlineSkipList {
   Splice* seq_splice_;
 
   inline int GetMaxHeight() const {
-    return max_height_.load(std::memory_order_relaxed);
+    return max_height_.load(std::memory_order_seq_cst);
   }
 
   int RandomHeight();
@@ -322,14 +322,14 @@ struct InlineSkipList<Comparator>::Node {
     assert(n >= 0);
     // Use an 'acquire load' so that we observe a fully initialized
     // version of the returned Node.
-    return ((&next_[0] - n)->load(std::memory_order_acquire));
+    return ((&next_[0] - n)->load(std::memory_order_seq_cst));
   }
 
   void SetNext(int n, Node* x) {
     assert(n >= 0);
     // Use a 'release store' so that anybody who reads through this
     // pointer observes a fully initialized version of the inserted node.
-    (&next_[0] - n)->store(x, std::memory_order_release);
+    (&next_[0] - n)->store(x, std::memory_order_seq_cst);
   }
 
   bool CASNext(int n, Node* expected, Node* x) {
@@ -340,12 +340,12 @@ struct InlineSkipList<Comparator>::Node {
   // No-barrier variants that can be safely used in a few locations.
   Node* NoBarrier_Next(int n) {
     assert(n >= 0);
-    return (&next_[0] - n)->load(std::memory_order_relaxed);
+    return (&next_[0] - n)->load(std::memory_order_seq_cst);
   }
 
   void NoBarrier_SetNext(int n, Node* x) {
     assert(n >= 0);
-    (&next_[0] - n)->store(x, std::memory_order_relaxed);
+    (&next_[0] - n)->store(x, std::memory_order_seq_cst);
   }
 
   // Insert node after prev on specific level.
@@ -806,7 +806,7 @@ bool InlineSkipList<Comparator>::Insert(const char* key, Splice* splice,
   int height = x->UnstashHeight();
   assert(height >= 1 && height <= kMaxHeight_);
 
-  int max_height = max_height_.load(std::memory_order_relaxed);
+  int max_height = max_height_.load(std::memory_order_seq_cst);
   while (height > max_height) {
     if (max_height_.compare_exchange_weak(max_height, height)) {
       // successfully updated it

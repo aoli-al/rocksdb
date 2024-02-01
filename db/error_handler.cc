@@ -354,7 +354,7 @@ const Status& ErrorHandler::HandleKnownErrors(const Status& bg_err,
     }
   }
   if (bg_error_.severity() >= Status::Severity::kHardError) {
-    is_db_stopped_.store(true, std::memory_order_release);
+    is_db_stopped_.store(true, std::memory_order_seq_cst);
   }
   return bg_error_;
 }
@@ -552,7 +552,7 @@ Status ErrorHandler::ClearBGError() {
     // old_bg_error is only for notifying listeners, so may not be checked
     old_bg_error.PermitUncheckedError();
     // Clear and check the recovery IO and BG error
-    is_db_stopped_.store(false, std::memory_order_release);
+    is_db_stopped_.store(false, std::memory_order_seq_cst);
     bg_error_ = Status::OK();
     recovery_error_ = IOStatus::OK();
     bg_error_.PermitUncheckedError();
@@ -771,7 +771,7 @@ void ErrorHandler::CheckAndSetRecoveryAndBGError(const Status& bg_err) {
     bg_error_ = bg_err;
   }
   if (bg_error_.severity() >= Status::Severity::kHardError) {
-    is_db_stopped_.store(true, std::memory_order_release);
+    is_db_stopped_.store(true, std::memory_order_seq_cst);
   }
 }
 

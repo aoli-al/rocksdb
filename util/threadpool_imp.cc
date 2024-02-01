@@ -53,7 +53,7 @@ struct ThreadPoolImpl::Impl {
   int GetBackgroundThreads();
 
   unsigned int GetQueueLen() const {
-    return queue_len_.load(std::memory_order_relaxed);
+    return queue_len_.load(std::memory_order_seq_cst);
   }
 
   void LowerIOPriority();
@@ -267,7 +267,7 @@ void ThreadPoolImpl::Impl::BGThread(size_t thread_id) {
     queue_.pop_front();
 
     queue_len_.store(static_cast<unsigned int>(queue_.size()),
-                     std::memory_order_relaxed);
+                     std::memory_order_seq_cst);
 
     bool decrease_io_priority = (low_io_priority != low_io_priority_);
     CpuPriority cpu_priority = cpu_priority_;
@@ -419,7 +419,7 @@ void ThreadPoolImpl::Impl::Submit(std::function<void()>&& schedule,
   item.unschedFunction = std::move(unschedule);
 
   queue_len_.store(static_cast<unsigned int>(queue_.size()),
-                   std::memory_order_relaxed);
+                   std::memory_order_seq_cst);
 
   if (!HasExcessiveThread()) {
     // Wake up at least one waiting thread.
@@ -452,7 +452,7 @@ int ThreadPoolImpl::Impl::UnSchedule(void* arg) {
       }
     }
     queue_len_.store(static_cast<unsigned int>(queue_.size()),
-                     std::memory_order_relaxed);
+                     std::memory_order_seq_cst);
   }
 
   // Run unschedule functions outside the mutex

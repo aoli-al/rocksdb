@@ -355,7 +355,7 @@ static void StackTraceHandler(int sig) {
     fprintf(stderr, "Too many recursive calls to stack trace handler (%d)\n",
             g_recursion_count);
   } else {
-    if (g_at_exit_called.load(std::memory_order_acquire)) {
+    if (g_at_exit_called.load(std::memory_order_seq_cst)) {
       fprintf(stderr, "In a race with process already exiting...\n");
     }
 
@@ -385,16 +385,16 @@ static void StackTraceHandler(int sig) {
   if (g_recursion_count > 0) {
     --g_recursion_count;
   } else {
-    g_thread_handling_stack_trace.store(0, std::memory_order_release);
+    g_thread_handling_stack_trace.store(0, std::memory_order_seq_cst);
   }
 }
 
 static void AtExit() {
   // wait for stack trace handler to finish, if needed
-  while (g_thread_handling_stack_trace.load(std::memory_order_acquire)) {
+  while (g_thread_handling_stack_trace.load(std::memory_order_seq_cst)) {
     usleep(1000);
   }
-  g_at_exit_called.store(true, std::memory_order_release);
+  g_at_exit_called.store(true, std::memory_order_seq_cst);
 }
 
 void InstallStackTraceHandler() {

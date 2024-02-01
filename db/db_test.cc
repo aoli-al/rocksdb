@@ -928,13 +928,13 @@ TEST_F(DBTest, GetFromImmutableLayer) {
     ASSERT_EQ("v1", Get(1, "foo"));
 
     // Block sync calls
-    env_->delay_sstable_sync_.store(true, std::memory_order_release);
+    env_->delay_sstable_sync_.store(true, std::memory_order_seq_cst);
     ASSERT_OK(Put(1, "k1", std::string(100000, 'x')));  // Fill memtable
     ASSERT_OK(Put(1, "k2", std::string(100000, 'y')));  // Trigger flush
     ASSERT_EQ("v1", Get(1, "foo"));
     ASSERT_EQ("NOT_FOUND", Get(0, "foo"));
     // Release sync calls
-    env_->delay_sstable_sync_.store(false, std::memory_order_release);
+    env_->delay_sstable_sync_.store(false, std::memory_order_seq_cst);
   } while (ChangeOptions());
 }
 
@@ -2758,7 +2758,7 @@ static void MTThreadBody(void* arg) {
   Random rnd(1000 + id);
   char valbuf[1500];
   while (clock->NowMicros() < end_micros) {
-    t->state->counter[id].store(counter, std::memory_order_release);
+    t->state->counter[id].store(counter, std::memory_order_seq_cst);
 
     int key = rnd.Uniform(kNumKeys);
     char keybuf[20];
@@ -2840,7 +2840,7 @@ static void MTThreadBody(void* arg) {
           ASSERT_EQ(k, key);
           ASSERT_GE(w, 0);
           ASSERT_LT(w, kNumThreads);
-          ASSERT_LE(c, t->state->counter[w].load(std::memory_order_acquire));
+          ASSERT_LE(c, t->state->counter[w].load(std::memory_order_seq_cst));
           ASSERT_EQ(cf, i);
           if (i == 0) {
             unique_id = u;
@@ -2895,7 +2895,7 @@ TEST_P(MultiThreadedDBTest, MultiThreaded) {
   MTState mt;
   mt.test = this;
   for (int id = 0; id < kNumThreads; id++) {
-    mt.counter[id].store(0, std::memory_order_release);
+    mt.counter[id].store(0, std::memory_order_seq_cst);
   }
 
   // Start threads

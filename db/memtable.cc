@@ -144,7 +144,7 @@ MemTable::MemTable(const InternalKeyComparator& cmp,
         local_cache_ref_ptr,
         std::shared_ptr<FragmentedRangeTombstoneListCache>(new_local_cache_ref,
                                                            new_cache.get()),
-        std::memory_order_relaxed);
+        std::memory_order_seq_cst);
   }
   const Comparator* ucmp = cmp.user_comparator();
   assert(ucmp);
@@ -171,7 +171,7 @@ size_t MemTable::ApproximateMemoryUsage() {
     }
     total_usage += usage;
   }
-  approximate_memory_usage_.store(total_usage, std::memory_order_relaxed);
+  approximate_memory_usage_.store(total_usage, std::memory_order_seq_cst);
   // otherwise, return the actual usage
   return total_usage;
 }
@@ -180,12 +180,12 @@ bool MemTable::ShouldFlushNow() {
   // This is set if memtable_max_range_deletions is > 0,
   // and that many range deletions are done
   if (memtable_max_range_deletions_ > 0 &&
-      num_range_deletes_.load(std::memory_order_relaxed) >=
+      num_range_deletes_.load(std::memory_order_seq_cst) >=
           static_cast<uint64_t>(memtable_max_range_deletions_)) {
     return true;
   }
 
-  size_t write_buffer_size = write_buffer_size_.load(std::memory_order_relaxed);
+  size_t write_buffer_size = write_buffer_size_.load(std::memory_order_seq_cst);
   // In a lot of times, we cannot allocate arena blocks that exactly matches the
   // buffer size. Thus we have to decide if we should over-allocate or
   // under-allocate.
@@ -200,7 +200,7 @@ bool MemTable::ShouldFlushNow() {
                           range_del_table_->ApproximateMemoryUsage() +
                           arena_.MemoryAllocatedBytes();
 
-  approximate_memory_usage_.store(allocated_memory, std::memory_order_relaxed);
+  approximate_memory_usage_.store(allocated_memory, std::memory_order_seq_cst);
 
   // if we can still allocate one more block without exceeding the
   // over-allocation ratio, then we should not flush.
@@ -245,18 +245,18 @@ bool MemTable::ShouldFlushNow() {
 }
 
 void MemTable::UpdateFlushState() {
-  auto state = flush_state_.load(std::memory_order_relaxed);
+  auto state = flush_state_.load(std::memory_order_seq_cst);
   if (state == FLUSH_NOT_REQUESTED && ShouldFlushNow()) {
     // ignore CAS failure, because that means somebody else requested
     // a flush
     flush_state_.compare_exchange_strong(state, FLUSH_REQUESTED,
-                                         std::memory_order_relaxed,
-                                         std::memory_order_relaxed);
+                                         std::memory_order_seq_cst,
+                                         std::memory_order_seq_cst);
   }
 }
 
 void MemTable::UpdateOldestKeyTime() {
-  uint64_t oldest_key_time = oldest_key_time_.load(std::memory_order_relaxed);
+  uint64_t oldest_key_time = oldest_key_time_.load(std::memory_order_seq_cst);
   if (oldest_key_time == std::numeric_limits<uint64_t>::max()) {
     int64_t current_time = 0;
     auto s = clock_->GetCurrentTime(&current_time);
@@ -265,7 +265,7 @@ void MemTable::UpdateOldestKeyTime() {
       // If fail, the timestamp is already set.
       oldest_key_time_.compare_exchange_strong(
           oldest_key_time, static_cast<uint64_t>(current_time),
-          std::memory_order_relaxed, std::memory_order_relaxed);
+          std::memory_order_seq_cst, std::memory_order_seq_cst);
     }
   }
 }
@@ -550,7 +550,7 @@ FragmentedRangeTombstoneIterator* MemTable::NewRangeTombstoneIterator(
     const ReadOptions& read_options, SequenceNumber read_seq,
     bool immutable_memtable) {
   if (read_options.ignore_range_deletions ||
-      is_range_del_table_empty_.load(std::memory_order_relaxed)) {
+      is_range_del_table_empty_.load(std::memory_order_seq_cst)) {
     return nullptr;
   }
   return NewRangeTombstoneIteratorInternal(read_options, read_seq,
@@ -572,9 +572,9 @@ FragmentedRangeTombstoneIterator* MemTable::NewRangeTombstoneIteratorInternal(
   // takes current cache
   std::shared_ptr<FragmentedRangeTombstoneListCache> cache =
       std::atomic_load_explicit(cached_range_tombstone_.Access(),
-                                std::memory_order_relaxed);
+                                std::memory_order_seq_cst);
   // construct fragmented tombstone list if necessary
-  if (!cache->initialized.load(std::memory_order_acquire)) {
+  if (!cache->initialized.load(std::memory_order_seq_cst)) {
     cache->reader_mutex.lock();
     if (!cache->tombstones) {
       auto* unfragmented_iter =
@@ -583,7 +583,7 @@ FragmentedRangeTombstoneIterator* MemTable::NewRangeTombstoneIteratorInternal(
       cache->tombstones.reset(new FragmentedRangeTombstoneList(
           std::unique_ptr<InternalIterator>(unfragmented_iter),
           comparator_.comparator));
-      cache->initialized.store(true, std::memory_order_release);
+      cache->initialized.store(true, std::memory_order_seq_cst);
     }
     cache->reader_mutex.unlock();
   }
@@ -596,7 +596,7 @@ FragmentedRangeTombstoneIterator* MemTable::NewRangeTombstoneIteratorInternal(
 void MemTable::ConstructFragmentedRangeTombstones() {
   assert(!IsFragmentedRangeTombstonesConstructed(false));
   // There should be no concurrent Construction
-  if (!is_range_del_table_empty_.load(std::memory_order_relaxed)) {
+  if (!is_range_del_table_empty_.load(std::memory_order_seq_cst)) {
     // TODO: plumb Env::IOActivity, Env::IOPriority
     auto* unfragmented_iter =
         new MemTableIterator(*this, ReadOptions(), nullptr /* arena */,
@@ -620,7 +620,7 @@ MemTable::MemTableStats MemTable::ApproximateStats(const Slice& start_ikey,
   if (entry_count == 0) {
     return {0, 0};
   }
-  uint64_t n = num_entries_.load(std::memory_order_relaxed);
+  uint64_t n = num_entries_.load(std::memory_order_seq_cst);
   if (n == 0) {
     return {0, 0};
   }
@@ -630,7 +630,7 @@ MemTable::MemTableStats MemTable::ApproximateStats(const Slice& start_ikey,
     // the inaccuracy.
     entry_count = n;
   }
-  uint64_t data_size = data_size_.load(std::memory_order_relaxed);
+  uint64_t data_size = data_size_.load(std::memory_order_seq_cst);
   return {entry_count * (data_size / n), entry_count};
 }
 
@@ -759,17 +759,17 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
 
     // this is a bit ugly, but is the way to avoid locked instructions
     // when incrementing an atomic
-    num_entries_.store(num_entries_.load(std::memory_order_relaxed) + 1,
-                       std::memory_order_relaxed);
-    data_size_.store(data_size_.load(std::memory_order_relaxed) + encoded_len,
-                     std::memory_order_relaxed);
+    num_entries_.store(num_entries_.load(std::memory_order_seq_cst) + 1,
+                       std::memory_order_seq_cst);
+    data_size_.store(data_size_.load(std::memory_order_seq_cst) + encoded_len,
+                     std::memory_order_seq_cst);
     if (type == kTypeDeletion || type == kTypeSingleDeletion ||
         type == kTypeDeletionWithTimestamp) {
-      num_deletes_.store(num_deletes_.load(std::memory_order_relaxed) + 1,
-                         std::memory_order_relaxed);
+      num_deletes_.store(num_deletes_.load(std::memory_order_seq_cst) + 1,
+                         std::memory_order_seq_cst);
     } else if (type == kTypeRangeDeletion) {
-      uint64_t val = num_range_deletes_.load(std::memory_order_relaxed) + 1;
-      num_range_deletes_.store(val, std::memory_order_relaxed);
+      uint64_t val = num_range_deletes_.load(std::memory_order_seq_cst) + 1;
+      num_range_deletes_.store(val, std::memory_order_seq_cst);
     }
 
     if (bloom_filter_ && prefix_extractor_ &&
@@ -783,11 +783,11 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
     // The first sequence number inserted into the memtable
     assert(first_seqno_ == 0 || s >= first_seqno_);
     if (first_seqno_ == 0) {
-      first_seqno_.store(s, std::memory_order_relaxed);
+      first_seqno_.store(s, std::memory_order_seq_cst);
 
       if (earliest_seqno_ == kMaxSequenceNumber) {
         earliest_seqno_.store(GetFirstSequenceNumber(),
-                              std::memory_order_relaxed);
+                              std::memory_order_seq_cst);
       }
       assert(first_seqno_.load() >= earliest_seqno_.load());
     }
@@ -821,12 +821,12 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
     }
 
     // atomically update first_seqno_ and earliest_seqno_.
-    uint64_t cur_seq_num = first_seqno_.load(std::memory_order_relaxed);
+    uint64_t cur_seq_num = first_seqno_.load(std::memory_order_seq_cst);
     while ((cur_seq_num == 0 || s < cur_seq_num) &&
            !first_seqno_.compare_exchange_weak(cur_seq_num, s)) {
     }
     uint64_t cur_earliest_seqno =
-        earliest_seqno_.load(std::memory_order_relaxed);
+        earliest_seqno_.load(std::memory_order_seq_cst);
     while (
         (cur_earliest_seqno == kMaxSequenceNumber || s < cur_earliest_seqno) &&
         !earliest_seqno_.compare_exchange_weak(cur_earliest_seqno, s)) {
@@ -853,13 +853,13 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
           local_cache_ref_ptr,
           std::shared_ptr<FragmentedRangeTombstoneListCache>(
               new_local_cache_ref, new_cache.get()),
-          std::memory_order_relaxed);
+          std::memory_order_seq_cst);
     }
 
     if (allow_concurrent) {
       range_del_mutex_.unlock();
     }
-    is_range_del_table_empty_.store(false, std::memory_order_relaxed);
+    is_range_del_table_empty_.store(false, std::memory_order_seq_cst);
   }
   UpdateOldestKeyTime();
 
@@ -1343,7 +1343,7 @@ void MemTable::MultiGet(const ReadOptions& read_options, MultiGetRange* range,
   // range tombstones. This is the simplest way to ensure range tombstones are
   // handled. TODO: allow Bloom checks where max_covering_tombstone_seq==0
   bool no_range_del = read_options.ignore_range_deletions ||
-                      is_range_del_table_empty_.load(std::memory_order_relaxed);
+                      is_range_del_table_empty_.load(std::memory_order_seq_cst);
   MultiGetRange temp_range(*range, range->begin(), range->end());
   if (bloom_filter_ && no_range_del) {
     bool whole_key =

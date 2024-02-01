@@ -59,7 +59,7 @@ Status CacheReservationManagerImpl<R>::UpdateCacheReservation(
     std::size_t new_mem_used) {
   memory_used_ = new_mem_used;
   std::size_t cur_cache_allocated_size =
-      cache_allocated_size_.load(std::memory_order_relaxed);
+      cache_allocated_size_.load(std::memory_order_seq_cst);
   if (new_mem_used == cur_cache_allocated_size) {
     return Status::OK();
   } else if (new_mem_used > cur_cache_allocated_size) {
@@ -112,7 +112,7 @@ template <CacheEntryRole R>
 Status CacheReservationManagerImpl<R>::IncreaseCacheReservation(
     std::size_t new_mem_used) {
   Status return_status = Status::OK();
-  while (new_mem_used > cache_allocated_size_.load(std::memory_order_relaxed)) {
+  while (new_mem_used > cache_allocated_size_.load(std::memory_order_seq_cst)) {
     Cache::Handle* handle = nullptr;
     return_status = cache_.Insert(GetNextCacheKey(), kSizeDummyEntry, &handle);
 
@@ -133,10 +133,10 @@ Status CacheReservationManagerImpl<R>::DecreaseCacheReservation(
 
   // Decrease to the smallest multiple of kSizeDummyEntry that is greater than
   // or equal to new_mem_used We do addition instead of new_mem_used <=
-  // cache_allocated_size_.load(std::memory_order_relaxed) - kSizeDummyEntry to
+  // cache_allocated_size_.load(std::memory_order_seq_cst) - kSizeDummyEntry to
   // avoid underflow of size_t when cache_allocated_size_ = 0
   while (new_mem_used + kSizeDummyEntry <=
-         cache_allocated_size_.load(std::memory_order_relaxed)) {
+         cache_allocated_size_.load(std::memory_order_seq_cst)) {
     assert(!dummy_handles_.empty());
     auto* handle = dummy_handles_.back();
     cache_.ReleaseAndEraseIfLastRef(handle);
@@ -148,7 +148,7 @@ Status CacheReservationManagerImpl<R>::DecreaseCacheReservation(
 
 template <CacheEntryRole R>
 std::size_t CacheReservationManagerImpl<R>::GetTotalReservedCacheSize() {
-  return cache_allocated_size_.load(std::memory_order_relaxed);
+  return cache_allocated_size_.load(std::memory_order_seq_cst);
 }
 
 template <CacheEntryRole R>

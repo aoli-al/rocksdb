@@ -165,12 +165,12 @@ class WritePreparedTxnDB : public PessimisticTransactionDB {
             "The read was intrupted 100 times by update to max_evicted_seq_. "
             "This is unexpected in all setups");
       }
-      max_evicted_seq_lb = max_evicted_seq_.load(std::memory_order_acquire);
+      max_evicted_seq_lb = max_evicted_seq_.load(std::memory_order_seq_cst);
       TEST_SYNC_POINT(
           "WritePreparedTxnDB::IsInSnapshot:max_evicted_seq_:pause");
       TEST_SYNC_POINT(
           "WritePreparedTxnDB::IsInSnapshot:max_evicted_seq_:resume");
-      was_empty = delayed_prepared_empty_.load(std::memory_order_acquire);
+      was_empty = delayed_prepared_empty_.load(std::memory_order_seq_cst);
       TEST_SYNC_POINT(
           "WritePreparedTxnDB::IsInSnapshot:delayed_prepared_empty_:pause");
       TEST_SYNC_POINT(
@@ -192,7 +192,7 @@ class WritePreparedTxnDB : public PessimisticTransactionDB {
       // commit, or never committed.
 
       // At this point we don't know if it was committed or it is still prepared
-      max_evicted_seq_ub = max_evicted_seq_.load(std::memory_order_acquire);
+      max_evicted_seq_ub = max_evicted_seq_.load(std::memory_order_seq_cst);
       if (UNLIKELY(max_evicted_seq_lb != max_evicted_seq_ub)) {
         continue;
       }
@@ -246,7 +246,7 @@ class WritePreparedTxnDB : public PessimisticTransactionDB {
                 prep_seq, snapshot_seq, cached.commit_seq <= snapshot_seq);
             return cached.commit_seq <= snapshot_seq;
           }
-          max_evicted_seq_ub = max_evicted_seq_.load(std::memory_order_acquire);
+          max_evicted_seq_ub = max_evicted_seq_.load(std::memory_order_seq_cst);
         }
       }
     } while (UNLIKELY(max_evicted_seq_lb != max_evicted_seq_ub));
@@ -268,7 +268,7 @@ class WritePreparedTxnDB : public PessimisticTransactionDB {
     // else (ii) might be the case: check the commit data saved for this
     // snapshot. If there was no overlapping commit entry, then it is committed
     // with a commit_seq lower than any live snapshot, including snapshot_seq.
-    if (old_commit_map_empty_.load(std::memory_order_acquire)) {
+    if (old_commit_map_empty_.load(std::memory_order_seq_cst)) {
       ROCKS_LOG_DETAILS(info_log_,
                         "IsInSnapshot %" PRIu64 " in %" PRIu64
                         " returns %" PRId32 " released=1",
@@ -457,7 +457,7 @@ class WritePreparedTxnDB : public PessimisticTransactionDB {
   // value seen by same thread.
   inline bool ValidateSnapshot(
       const SequenceNumber snap_seq, const SnapshotBackup backed_by_snapshot,
-      std::memory_order order = std::memory_order_relaxed);
+      std::memory_order order = std::memory_order_seq_cst);
   // Get a dummy snapshot that refers to kMaxSequenceNumber
   Snapshot* GetMaxSnapshot() { return &dummy_max_snapshot_; }
 
@@ -557,11 +557,11 @@ class WritePreparedTxnDB : public PessimisticTransactionDB {
 
     inline bool empty() { return top() == kMaxSequenceNumber; }
     // Returns kMaxSequenceNumber if empty() and the smallest otherwise.
-    inline uint64_t top() { return heap_top_.load(std::memory_order_acquire); }
+    inline uint64_t top() { return heap_top_.load(std::memory_order_seq_cst); }
     inline void push(uint64_t v) {
       push_pop_mutex_.AssertHeld();
       if (heap_.empty()) {
-        heap_top_.store(v, std::memory_order_release);
+        heap_top_.store(v, std::memory_order_seq_cst);
       } else {
         assert(heap_top_.load() < v);
       }
@@ -591,7 +591,7 @@ class WritePreparedTxnDB : public PessimisticTransactionDB {
         erased_heap_.pop();
       }
       heap_top_.store(!heap_.empty() ? heap_.front() : kMaxSequenceNumber,
-                      std::memory_order_release);
+                      std::memory_order_seq_cst);
       if (!locked) {
         push_pop_mutex()->Unlock();
       }

@@ -35,18 +35,18 @@ struct BucketHeader {
       : next(n), num_entries(count) {}
 
   bool IsSkipListBucket() {
-    return next.load(std::memory_order_relaxed) == this;
+    return next.load(std::memory_order_seq_cst) == this;
   }
 
   uint32_t GetNumEntries() const {
-    return num_entries.load(std::memory_order_relaxed);
+    return num_entries.load(std::memory_order_seq_cst);
   }
 
   // REQUIRES: called from single-threaded Insert()
   void IncNumEntries() {
     // Only one thread can do write at one time. No need to do atomic
     // incremental. Update it with relaxed load and store.
-    num_entries.store(GetNumEntries() + 1, std::memory_order_relaxed);
+    num_entries.store(GetNumEntries() + 1, std::memory_order_seq_cst);
   }
 };
 
@@ -68,17 +68,17 @@ struct Node {
   Node* Next() {
     // Use an 'acquire load' so that we observe a fully initialized
     // version of the returned Node.
-    return next_.load(std::memory_order_acquire);
+    return next_.load(std::memory_order_seq_cst);
   }
   void SetNext(Node* x) {
     // Use a 'release store' so that anybody who reads through this
     // pointer observes a fully initialized version of the inserted node.
-    next_.store(x, std::memory_order_release);
+    next_.store(x, std::memory_order_seq_cst);
   }
   // No-barrier variants that can be safely used in a few locations.
-  Node* NoBarrier_Next() { return next_.load(std::memory_order_relaxed); }
+  Node* NoBarrier_Next() { return next_.load(std::memory_order_seq_cst); }
 
-  void NoBarrier_SetNext(Node* x) { next_.store(x, std::memory_order_relaxed); }
+  void NoBarrier_SetNext(Node* x) { next_.store(x, std::memory_order_seq_cst); }
 
   // Needed for placement new below which is fine
   Node() = default;
@@ -207,7 +207,7 @@ class HashLinkListRep : public MemTableRep {
   bool LinkListContains(Node* head, const Slice& key) const;
 
   bool IsEmptyBucket(Pointer& bucket_pointer) const {
-    return bucket_pointer.load(std::memory_order_acquire) == nullptr;
+    return bucket_pointer.load(std::memory_order_seq_cst) == nullptr;
   }
 
   // Precondition: GetLinkListFirstNode() must have been called first and return
@@ -522,7 +522,7 @@ HashLinkListRep::HashLinkListRep(
   buckets_ = new (mem) Pointer[bucket_size];
 
   for (size_t i = 0; i < bucket_size_; ++i) {
-    buckets_[i].store(nullptr, std::memory_order_relaxed);
+    buckets_[i].store(nullptr, std::memory_order_seq_cst);
   }
 }
 
@@ -538,9 +538,9 @@ KeyHandle HashLinkListRep::Allocate(const size_t len, char** buf) {
 SkipListBucketHeader* HashLinkListRep::GetSkipListBucketHeader(
     Pointer& bucket_pointer) const {
   Pointer* first_next_pointer =
-      static_cast<Pointer*>(bucket_pointer.load(std::memory_order_acquire));
+      static_cast<Pointer*>(bucket_pointer.load(std::memory_order_seq_cst));
   assert(first_next_pointer != nullptr);
-  assert(first_next_pointer->load(std::memory_order_relaxed) != nullptr);
+  assert(first_next_pointer->load(std::memory_order_seq_cst) != nullptr);
 
   // Counting header
   BucketHeader* header = reinterpret_cast<BucketHeader*>(first_next_pointer);
@@ -549,15 +549,15 @@ SkipListBucketHeader* HashLinkListRep::GetSkipListBucketHeader(
   auto* skip_list_bucket_header =
       reinterpret_cast<SkipListBucketHeader*>(header);
   assert(skip_list_bucket_header->Counting_header.next.load(
-             std::memory_order_relaxed) == header);
+             std::memory_order_seq_cst) == header);
   return skip_list_bucket_header;
 }
 
 Node* HashLinkListRep::GetLinkListFirstNode(Pointer& bucket_pointer) const {
   Pointer* first_next_pointer =
-      static_cast<Pointer*>(bucket_pointer.load(std::memory_order_acquire));
+      static_cast<Pointer*>(bucket_pointer.load(std::memory_order_seq_cst));
   assert(first_next_pointer != nullptr);
-  if (first_next_pointer->load(std::memory_order_relaxed) == nullptr) {
+  if (first_next_pointer->load(std::memory_order_seq_cst) == nullptr) {
     // Single entry bucket
     return reinterpret_cast<Node*>(first_next_pointer);
   }
@@ -567,13 +567,13 @@ Node* HashLinkListRep::GetLinkListFirstNode(Pointer& bucket_pointer) const {
   // modified to a counting header, so we should reload the first_next_pointer
   // to make sure we see the update.
   first_next_pointer =
-      static_cast<Pointer*>(bucket_pointer.load(std::memory_order_acquire));
+      static_cast<Pointer*>(bucket_pointer.load(std::memory_order_seq_cst));
   // Counting header
   BucketHeader* header = reinterpret_cast<BucketHeader*>(first_next_pointer);
   if (!header->IsSkipListBucket()) {
     assert(header->GetNumEntries() <= threshold_use_skiplist_);
     return reinterpret_cast<Node*>(
-        header->next.load(std::memory_order_acquire));
+        header->next.load(std::memory_order_seq_cst));
   }
   assert(header->GetNumEntries() > threshold_use_skiplist_);
   return nullptr;
@@ -586,19 +586,19 @@ void HashLinkListRep::Insert(KeyHandle handle) {
   auto transformed = GetPrefix(internal_key);
   auto& bucket = buckets_[GetHash(transformed)];
   Pointer* first_next_pointer =
-      static_cast<Pointer*>(bucket.load(std::memory_order_relaxed));
+      static_cast<Pointer*>(bucket.load(std::memory_order_seq_cst));
 
   if (first_next_pointer == nullptr) {
     // Case 1. empty bucket
     // NoBarrier_SetNext() suffices since we will add a barrier when
     // we publish a pointer to "x" in prev[i].
     x->NoBarrier_SetNext(nullptr);
-    bucket.store(x, std::memory_order_release);
+    bucket.store(x, std::memory_order_seq_cst);
     return;
   }
 
   BucketHeader* header = nullptr;
-  if (first_next_pointer->load(std::memory_order_relaxed) == nullptr) {
+  if (first_next_pointer->load(std::memory_order_seq_cst) == nullptr) {
     // Case 2. only one entry in the bucket
     // Need to convert to a Counting bucket and turn to case 4.
     Node* first = reinterpret_cast<Node*>(first_next_pointer);
@@ -609,7 +609,7 @@ void HashLinkListRep::Insert(KeyHandle handle) {
     // think the node is a bucket header.
     auto* mem = allocator_->AllocateAligned(sizeof(BucketHeader));
     header = new (mem) BucketHeader(first, 1);
-    bucket.store(header, std::memory_order_release);
+    bucket.store(header, std::memory_order_seq_cst);
   } else {
     header = reinterpret_cast<BucketHeader*>(first_next_pointer);
     if (header->IsSkipListBucket()) {
@@ -641,7 +641,7 @@ void HashLinkListRep::Insert(KeyHandle handle) {
     // skip list.
     LinkListIterator bucket_iter(
         this, reinterpret_cast<Node*>(
-                  first_next_pointer->load(std::memory_order_relaxed)));
+                  first_next_pointer->load(std::memory_order_seq_cst)));
     auto mem = allocator_->AllocateAligned(sizeof(SkipListBucketHeader));
     SkipListBucketHeader* new_skip_list_header = new (mem)
         SkipListBucketHeader(compare_, allocator_, header->GetNumEntries() + 1);
@@ -655,12 +655,12 @@ void HashLinkListRep::Insert(KeyHandle handle) {
     // insert the new entry
     skip_list.Insert(x->key);
     // Set the bucket
-    bucket.store(new_skip_list_header, std::memory_order_release);
+    bucket.store(new_skip_list_header, std::memory_order_seq_cst);
   } else {
     // Case 5. Need to insert to the sorted linked list without changing the
     // header.
     Node* first =
-        reinterpret_cast<Node*>(header->next.load(std::memory_order_relaxed));
+        reinterpret_cast<Node*>(header->next.load(std::memory_order_seq_cst));
     assert(first != nullptr);
     // Advance counter unless the bucket needs to be advanced to skip list.
     // In that case, we need to make sure the previous count never exceeds
@@ -697,7 +697,7 @@ void HashLinkListRep::Insert(KeyHandle handle) {
     if (prev) {
       prev->SetNext(x);
     } else {
-      header->next.store(static_cast<void*>(x), std::memory_order_release);
+      header->next.store(static_cast<void*>(x), std::memory_order_seq_cst);
     }
   }
 }

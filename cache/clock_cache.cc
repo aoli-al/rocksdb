@@ -836,7 +836,7 @@ FixedHyperClockTable::HandleImpl* FixedHyperClockTable::Lookup(
         // Mostly branch-free version (similar performance)
         /*
         uint64_t old_meta = h->meta.FetchAdd(ClockHandle::kAcquireIncrement,
-                                     std::memory_order_acquire);
+                                     std::memory_order_seq_cst);
         bool Shareable = (old_meta >> (ClockHandle::kStateShift + 1)) & 1U;
         bool visible = (old_meta >> ClockHandle::kStateShift) & 1U;
         bool match = (h->key == key) & visible;

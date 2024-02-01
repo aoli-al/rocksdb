@@ -145,7 +145,7 @@ class BlobFile {
   // the following functions are atomic, and don't need
   // read lock
   uint64_t BlobCount() const {
-    return blob_count_.load(std::memory_order_acquire);
+    return blob_count_.load(std::memory_order_seq_cst);
   }
 
   std::string DumpState() const;
@@ -183,7 +183,7 @@ class BlobFile {
   Status Fsync(const WriteOptions& write_options);
 
   uint64_t GetFileSize() const {
-    return file_size_.load(std::memory_order_acquire);
+    return file_size_.load(std::memory_order_seq_cst);
   }
 
   // All Get functions which are not atomic, will need ReadLock on the mutex

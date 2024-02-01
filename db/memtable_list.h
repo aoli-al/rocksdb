@@ -347,7 +347,7 @@ class MemTableList {
     // impact whatsoever. Imm_flush_needed is only used in an assert
     // in IsFlushPending().
     if (num_flush_not_started_ > 0) {
-      imm_flush_needed.store(true, std::memory_order_release);
+      imm_flush_needed.store(true, std::memory_order_seq_cst);
     }
   }
 
@@ -358,13 +358,13 @@ class MemTableList {
   bool MarkTrimHistoryNeeded() {
     auto expected = false;
     return imm_trim_needed.compare_exchange_strong(
-        expected, true, std::memory_order_relaxed, std::memory_order_relaxed);
+        expected, true, std::memory_order_seq_cst, std::memory_order_seq_cst);
   }
 
   void ResetTrimHistoryNeeded() {
     auto expected = true;
     imm_trim_needed.compare_exchange_strong(
-        expected, false, std::memory_order_relaxed, std::memory_order_relaxed);
+        expected, false, std::memory_order_seq_cst, std::memory_order_seq_cst);
   }
 
   // Copying allowed
