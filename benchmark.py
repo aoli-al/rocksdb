@@ -3,9 +3,9 @@ import os
 import shutil
 from pathlib import Path
 
-DB_BASE="/data/db/"
-WAL_BASE="/data/wal/"
-OUT_BASE="/data/out/"
+DB_BASE="/data/db2/"
+WAL_BASE="/data/wal2/"
+OUT_BASE="/data/out2/"
 
 
 class Benchmark():
@@ -24,7 +24,7 @@ class Benchmark():
 
     def run(self, cwd, t):
         env = {
-            "NUM_KEYS": "900000000",
+            "NUM_KEYS": "100000000",
             "CACHE_SIZE": "6442450944",
             "DB_DIR": self.prepare_dir(os.path.join(DB_BASE, t)),
             "WAL_DIR": self.prepare_dir(os.path.join(WAL_BASE, t)),
@@ -37,15 +37,15 @@ class Benchmark():
         subprocess.run("./tools/benchmark.sh" + " " + self.name + " " + " ".join(self.args), shell=True, env=env, cwd=cwd)
 
 bms = [
-    Benchmark("bulkload", False),
-    Benchmark("readrandom"),
-    Benchmark("multireadrandom", args=["--multiread_batched"]),
+    # Benchmark("bulkload", False),
+    # Benchmark("readrandom"),
+    # Benchmark("multireadrandom", args=["--multiread_batched"]),
     Benchmark("fwdrange"),
     Benchmark("revrange"),
-    Benchmark("overwrite"),
-    Benchmark("readwhilewriting", env={"MB_WRITE_PER_SEC": "2"}),
-    Benchmark("fwdrangewhilewriting", env={"MB_WRITE_PER_SEC": "2"}),
-    Benchmark("revrangewhilewriting", env={"MB_WRITE_PER_SEC": "2"}),
+    # Benchmark("overwrite"),
+    # Benchmark("readwhilewriting", env={"MB_WRITE_PER_SEC": "2"}),
+    # Benchmark("fwdrangewhilewriting", env={"MB_WRITE_PER_SEC": "2"}),
+    # Benchmark("revrangewhilewriting", env={"MB_WRITE_PER_SEC": "2"}),
 ]
 
 def main():
@@ -53,7 +53,6 @@ def main():
     cur_path = "."
     for bm in bms:
         bm.run(ori_path, "ori")
-    for bm in bms:
         bm.run(cur_path, "cst")
 
 
